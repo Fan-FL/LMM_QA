@@ -1,12 +1,12 @@
 class Config:
     def __init__(self):
-        self.doc_fname = 'Data/documents.json'
-        self.train_fname = 'Data/training.json'
-        self.dev_fname = 'Data/devel.json'
-        self.test_fname = 'Data/testing.json'
+        self.doc_file_name = 'Data/documents.json'
+        self.train_file_name = 'Data/training.json'
+        self.dev_file_name = 'Data/devel.json'
+        self.test_file_name = 'Data/testing.json'
 
         self.embedding_size = 300
-        self.word2vec_model_path = 'Google_word2vec/GoogleNews-vectors-negative300.bin'
+        self.word2vec_model_path = 'model/pruned.word2vec.txt'
         self.ner_model_path = 'stanford/stanford_ner/classifiers/english.all.3class.distsim.crf.ser.gz'
         self.ner_jar_path = 'stanford/stanford_ner/stanford-ner.jar'
         self.pos_model_path = 'stanford/stanford-postagger/models/english-bidirectional-distsim.tagger'

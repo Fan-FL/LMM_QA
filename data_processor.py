@@ -37,27 +37,27 @@ class DataProcessor:
 
 
     def load_word2vec_model(self):
-        self.model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path, binary=True)
+        self.model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path, binary=False)
 
     def load_qtype_model(self):
         with open(self.config.q_type_clf_save_path, 'rb') as f:
             self.qtype_model = pickle.load(f)
 
     def load_raw_dev(self):
-        return self.load_json(self.config.dev_fname)
+        return self.load_json(self.config.dev_file_name)
 
     def load_raw_test(self):
-        return self.load_json(self.config.test_fname)
+        return self.load_json(self.config.test_file_name)
 
     def load_raw_train(self):
-        return self.load_json(self.config.train_fname)
+        return self.load_json(self.config.train_file_name)
 
     def load_raw_doc(self):
-        return self.load_json(self.config.doc_fname)
+        return self.load_json(self.config.doc_file_name)
 
-    def load_json(self, fname):
-        f = codecs.open(fname, 'rb', encoding='utf-8')
-        print fname + ' done'
+    def load_json(self, file_name):
+        f = codecs.open(file_name, 'rb', encoding='utf-8')
+        print file_name + ' done'
         data = json.load(f)
         questions = list()
         docids = list()
@@ -65,13 +65,13 @@ class DataProcessor:
         ids = list()
         texts = list()
         for item in data:
-            if 'documents' in fname:
+            if 'documents' in file_name:
                 docids.append(item['docid'])
                 texts.append(item['text'])
             else:
                 questions.append(item['question'])
                 docids.append(item['docid'])
-                if 'test' in fname:
+                if 'test' in file_name:
                     ids.append(item['id'])
                 else:
                     texts.append(item['text'])
@@ -111,26 +111,26 @@ class DataProcessor:
     def remove_mark(self, word):
         return ''.join([c for c in word if c not in punctuation])
 
-    def ner_tagging(self, wiki):
-        ner_wiki = self.tagger.tag_sents(wiki)
+    def ner_tagging(self, doc):
+        ner_doc = self.tagger.tag_sents(doc)
         new_ners = []
-        for i in range(len(ner_wiki)):
-            sent = wiki[i]
-            pos_sent = pos_tag(sent)
-            ner_sent = ner_wiki[i]
-            new_ner_sent = []
-            for j in range(len(ner_sent)):
-                span, tag = ner_sent[j]
-                _, pos = pos_sent[j]
-                if span.isdigit() or pos == 'CD':
-                    new_ner_sent.append((span, 'NUMBER'))
+        for i in range(len(ner_doc)):
+            par = doc[i]
+            pos_par = pos_tag(par)
+            ner_par = ner_doc[i]
+            new_ner_par = []
+            for j in range(len(ner_par)):
+                word, tag = ner_par[j]
+                _, pos = pos_par[j]
+                if word.isdigit() or pos == 'CD':
+                    new_ner_par.append((word, 'NUMBER'))
                 elif tag == 'ORGANIZATION':
-                    new_ner_sent.append((span, 'OTHER'))
-                elif j != 0 and tag == 'O' and span[0].isupper():
-                    new_ner_sent.append((span, 'OTHER'))
+                    new_ner_par.append((word, 'OTHER'))
+                elif j != 0 and tag == 'O' and word[0].isupper():
+                    new_ner_par.append((word, 'OTHER'))
                 else:
-                    new_ner_sent.append((span, tag))
-            new_ners.append(new_ner_sent)
+                    new_ner_par.append((word, tag))
+            new_ners.append(new_ner_par)
         return new_ners
 
     def is_all_puncs(self, token):
@@ -141,8 +141,8 @@ class DataProcessor:
     def remove_punc_in_token(self, token):
         return ''.join([x for x in token if x not in punctuation]).strip()
 
-    def preprocess_wiki(self, wiki):
-        raw_split = [word_tokenize(sent.replace(u"\u200b",'')) for sent in wiki]
+    def preprocess_doc(self, doc):
+        raw_split = [word_tokenize(sent.replace(u"\u200b",'')) for sent in doc]
         remove_pure_punc = [[token for token in sent if not self.is_all_puncs(token)] for sent in raw_split]
         remove_punc_in_words = [[self.remove_punc_in_token(token) for token in sent] for sent in remove_pure_punc]
         ner = self.ner_tagging(remove_punc_in_words)
@@ -179,10 +179,10 @@ class DataProcessor:
         return lemmatized
 
     def preprocess_questions(self, raw_qs):
-        split = [word_tokenize(sent.replace(u"\u200b",'').replace(u"\u2014",'')) for sent in raw_qs]
-        remove_pure_punc = [[token for token in sent if not self.is_all_puncs(token)] for sent in split]
-        remove_punc_in_words = [[self.remove_punc_in_token(token) for token in sent] for sent in remove_pure_punc]
-        lemmatized = [self.lemmatize_sent(sent) for sent in remove_punc_in_words]
+        raw_split = word_tokenize(raw_qs.replace(u"\u200b", '').replace(u"\u2014", ''))
+        remove_pure_punc = [token for token in raw_split if not self.is_all_puncs(token)]
+        remove_punc_in_words = [self.remove_punc_in_token(token) for token in remove_pure_punc]
+        lemmatized = self.lemmatize_sent(remove_punc_in_words)
         return lemmatized
 
     def preprocess_answers(self, answers):
@@ -327,7 +327,6 @@ class DataProcessor:
     # returning a list ranked by descending order
     # like [(3, 21.44802474790178), (18, 3.1944542200601345), (0, 2.4847094773431535),...]
     def get_best_par(self, query, doc):
-        inv_dict = defaultdict(dict)
         # the number of paragraphs that contains a given word
         idf_dict = defaultdict(int)
         # term frequency in each paragraph. like{'word1':{1:5,2:4,3:0},'word2':{1:2..}...}

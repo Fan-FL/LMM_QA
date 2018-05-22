@@ -1,11 +1,14 @@
-import numpy as np
-a = np.arange([[1, 2]])
-b = np.arange([[1, 2]])
-b = list([3, 4])
-c = a+b
-c += [1.5]
-print c
+from nltk.stem.wordnet import WordNetLemmatizer
 
-x = np.array([[1, 2]])
-print np.mean(x, axis=0)
 
+from enum import Enum, unique
+@unique
+class DocType(Enum):
+    train = 0,
+    dev = 1,
+    test = 2
+
+if DocType.train == DocType.train:
+    print 1111
+
+print DocType.train

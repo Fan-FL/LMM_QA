@@ -1,3 +1,5 @@
 
 Google_word2vec/GoogleNews-vectors-negative300.bin
 stanford/*
+*.pkl
+*.txt
