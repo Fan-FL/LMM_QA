@@ -7,6 +7,8 @@ class BM25:
     def __init__(self, config, data):
         self.config = config
         self.data = data
+        self.k1 = 0.5
+        self.b = 0.5
 
     # the function return the paragraph(sentence) in document that matches best to the query
     # based on bm25
@@ -53,7 +55,7 @@ class BM25:
                 else:
                     fdt = 0
                 fqt = tf_query_dict[term]
-                acc_bm25_score += self.cal_bm25(pars_count, ft, fdt, fqt, par_Length, parLength_avg)
+                acc_bm25_score += self.cal_bm25(pars_count, ft, fdt, fqt, par_Length, parLength_avg, self.k1, self.b)
             acc_bm25_dict[i] = acc_bm25_score
         sorted_acc_bm25_dict = sorted(list(acc_bm25_dict.items()), key=lambda item: item[1], reverse=True)
         return sorted_acc_bm25_dict
@@ -66,7 +68,7 @@ class BM25:
     # fqt: number of a given term in a query
     # Ld: length of the document
     # Ld_avg: average length of the document
-    def cal_bm25(self, N, ft, fdt, fqt, Ld, Ld_avg, k1=1, b=0.5, k3=0):
+    def cal_bm25(self, N, ft, fdt, fqt, Ld, Ld_avg, k1=1.2, b=0.75, k3=0):
         idf_component = log((N - ft + 0.5) / (ft + 0.5))
         doc_tf_component = ((k1 + 1) * fdt) / ((k1 - k1 * b + k1 * b * Ld / Ld_avg) + fdt)
         query_tf_component = ((k3 + 1) * fqt) / (k3 + fqt)
@@ -81,7 +83,7 @@ class BM25:
             totalLen += len(par)
         return totalLen / N
 
-    def test_training_BM25_accuracy(self, max_tolerant_num):
+    def test_training_BM25_accuracy(self, max_tolerant_num, fname):
         n_accuary = defaultdict(int)
         # total = 10
         total = len(self.data.train_qs_processed)
@@ -108,7 +110,7 @@ class BM25:
                     else:
                         break
         # print n_accuary
-        with open('training_BM25_accuracy.csv', 'wb') as csv_file:
+        with open(fname, 'wb') as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['total', str(total)])
             csv_writer.writerow(['N', "correct", 'accuracy'])
@@ -142,12 +144,15 @@ class BM25:
                                 n_accuary[m] += 1
                     else:
                         break
-
+        return 1.0 * n_accuary[1] / total
         # print n_accuary
-        with open('dev_BM25_accuracy.csv', 'wb') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            csv_writer.writerow(['total', str(total)])
-            csv_writer.writerow(['N', "correct", 'accuracy'])
-            for k, v in list(n_accuary.items()):
-                csv_writer.writerow([str(k), str(v), str(1.0 * v / total)])
-                print(str(k), str(v), str(1.0 * v / total))
+        # with open('dev_BM25_accuracy3.csv', 'wb') as csv_file:
+        #     csv_writer = csv.writer(csv_file)
+        #     csv_writer.writerow(['total', str(total)])
+        #     csv_writer.writerow(['N', "correct", 'accuracy'])
+        #     for k, v in list(n_accuary.items()):
+        #         csv_writer.writerow([str(k), str(v), str(1.0 * v / total)])
+        #         print(str(k), str(v), str(1.0 * v / total))
+        #     csv_writer.writerow([str(self.k1), str(self.b)])
+        #     print([str(self.k1), str(self.b)])
+

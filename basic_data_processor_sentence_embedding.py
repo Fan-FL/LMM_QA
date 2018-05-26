@@ -53,7 +53,23 @@ class BasicDataProcessor:
 
         # self.trn.load_data(question_vectors, sent_vectors, label)
         # self.trn.run()
-        with open(self.config.training_ner_pkl, 'wb') as f:
+        with open(self.config.dev_ner_pkl, 'wb') as f:
+            # pickle.dump([question_vectors, answer_tags], f)
+            pickle.dump(answer_tags, f, protocol=2)
+
+
+    def dev_sens_embeddings(self):
+        question_vectors = []
+        answer_tags = []
+        label = []
+        total = int(len(self.data.dev_qs_processed))
+
+        for i in range(total):
+            if i%1000 == 0:
+                print(i, '/', total)
+            train_answer = self.data.dev_answers[i]
+            answer_tags.append(self.nlp.ner(train_answer))
+        with open(self.config.dev_ner_pkl, 'wb') as f:
             # pickle.dump([question_vectors, answer_tags], f)
             pickle.dump(answer_tags, f, protocol=2)
 

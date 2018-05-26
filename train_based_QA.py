@@ -6,8 +6,8 @@ from basic_data_processor_sentence_embedding import BasicDataProcessor
 
 class TrainBasedQA:
     def __init__(self):
-        train = 1
-        dev = 0
+        train = 0
+        dev = 1
         test = 0
         load_processed_doc = 0
         load_doc_from_pkl = 0
@@ -15,6 +15,7 @@ class TrainBasedQA:
         load_dev_qs_from_pkl = 1
         load_test_qs_from_pkl = 1
         train_sens_embedding = 1
+        dev_sens_embedding = 1
 
         self.data = Data()
         self.config = Config()
@@ -58,7 +59,8 @@ class TrainBasedQA:
                 with open(self.config.dev_qs_processed_path, 'wb') as f:
                     pickle.dump(self.data.dev_qs_processed, f)
 
-            self.answer_dev()
+            if dev_sens_embedding:
+                self.bdp.dev_sens_embeddings()
 
         if test:
             self.fileLoader.load_test_data()

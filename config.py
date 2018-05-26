@@ -24,6 +24,7 @@ class Config:
         self.dev_rule_pkl = 'pkl/dev_rule_pkl.pkl'
         self.sentence_embedding_pkl = 'pkl/sentence_embedding.pkl'
         self.training_ner_pkl = 'pkl/training_ner.pkl'
+        self.dev_ner_pkl = 'pkl/dev_ner.pkl'
 
         self.doc_processed_path_bak = 'pkl_bak/doc_processed.pkl'
         self.train_qs_processed_path_bak = 'pkl_bak/train_qs_processed.pkl'

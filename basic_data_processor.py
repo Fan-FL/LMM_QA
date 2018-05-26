@@ -233,6 +233,12 @@ class BasicDataProcessor:
     def get_entity_names(self, entity):
         return [item[0].lower() for item in entity]
 
+    def lemmatize_entity_name(self, entity_name):
+        tokens = entity_name.split()
+        tokens = self.lemmatize_tokens(tokens)
+        return ' '.join(tokens)
+
+
 if __name__ == '__main__':
     data = Data()
     config = Config()
