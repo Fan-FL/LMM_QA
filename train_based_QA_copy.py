@@ -12,35 +12,84 @@ from collections import defaultdict
 from sklearn import svm
 import unicodecsv as csv
 from file_loader import FileLoader
+from data import Data
+from basic_data_processor_sentence_embedding import BasicDataProcessor
+from bm25 import BM25
 
-class Trainer:
-    def __init__(self, train=1, dev=1, test=None, load_data=1, load_model=None):
-        self.dataProcessor = DataProcessor()
+class TrainBasedQA:
+    def __init__(self):
+        train = 1
+        dev = 0
+        test = 0
+        load_processed_doc = 1
+        load_doc_from_pkl = 0
+        load_train_qs_from_pkl = 1
+        load_dev_qs_from_pkl = 1
+        load_test_qs_from_pkl = 1
+        test_BM25 = 0
+        train_sens_embedding = 1
+
+        self.data = Data()
         self.config = Config()
-        self.fileLoader = FileLoader(self.config)
-        self.dataProcessor.load_word2vec_model()
+        self.fileLoader = FileLoader(self.config, self.data)
+        self.bdp = BasicDataProcessor(self.config, self.data)
+        self.bm25 = BM25(self.config, self.data)
+        # self.dataProcessor = DataProcessor()
+        # self.dataProcessor.load_word2vec_model()
 
-        self.load_raw_doc()
+        self.fileLoader.load_doc()
+        if load_processed_doc:
+            if load_doc_from_pkl:
+                with open(self.config.doc_processed_path, 'rb') as f:
+                    self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens, self.data.doc_ner_sents, self.data.doc_processed = pickle.load(
+                        f)
+            else:
+                self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens, self.data.doc_ner_sents, self.data.doc_processed = self.bdp.process_docs(
+                    self.data.doc_texts)
+                with open(self.config.doc_processed_path, 'wb') as f:
+                    pickle.dump([self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens,
+                                 self.data.doc_ner_sents, self.data.doc_processed], f)
 
-        if train == 1:
-            self.load_raw_training()
+        if train:
+            self.fileLoader.load_training_data()
+            if load_train_qs_from_pkl:
+                with open(self.config.train_qs_processed_path, 'rb') as f:
+                    self.data.train_qs_processed = pickle.load(f)
 
-        if dev == 1:
-            self.load_raw_dev()
-            self.process_dev_data()
+            else:
+                self.data.train_qs_processed = self.bdp.preprocess_questions(self.data.train_questions)
+                with open(self.config.train_qs_processed_path, 'wb') as f:
+                    pickle.dump(self.data.train_qs_processed, f)
 
-        if test == 1:
-            self.load_raw_test()
-            self.process_test_data()
+            if test_BM25:
+                self.bm25.test_training_BM25_accuracy(10)
 
-        if load_data:
-            with open('processed_data.pkl', 'rb') as f:
-                self.processed_qs, self.processed_doc = pickle.load(f)
-        else:
-            self.process_data()
+            if train_sens_embedding:
+                self.bdp.train_sens_embeddings()
 
-        # self.test_training_BM25_accuracy(10)
-        # self.test_dev_BM25_accuracy(10)
+        if dev:
+            self.fileLoader.load_dev_data()
+            if load_dev_qs_from_pkl:
+                with open(self.config.dev_qs_processed_path, 'rb') as f:
+                    self.data.dev_qs_processed = pickle.load(f)
+            else:
+                self.data.dev_qs_processed = self.bdp.preprocess_questions(self.data.dev_questions)
+                with open(self.config.dev_qs_processed_path, 'wb') as f:
+                    pickle.dump(self.data.dev_qs_processed, f)
+            if test_BM25:
+                self.bm25.test_dev_BM25_accuracy(10)
+
+            self.answer_dev()
+
+        if test:
+            self.fileLoader.load_test_data()
+            if load_test_qs_from_pkl:
+                with open(self.config.test_qs_processed_path, 'rb') as f:
+                    self.data.test_qs_processed = pickle.load(f)
+            else:
+                self.data.test_qs_processed = self.bdp.preprocess_questions(self.data.test_questions)
+                with open(self.config.test_qs_processed_path, 'wb') as f:
+                    pickle.dump(self.data.test_qs_processed, f)
 
 
 
@@ -60,32 +109,6 @@ class Trainer:
         # self.evaluateTrain()
 
 
-
-    def load_raw_training(self):
-        self.docids, self.questions, self.answers, self.answer_paragraphs, _ = self.dataProcessor.load_raw_train()
-
-    def load_raw_doc(self):
-        self.doc_docids, _, self.texts, _, _ = self.dataProcessor.load_raw_doc()
-
-    def load_raw_dev(self):
-        self.dev_docids, self.dev_questions, self.dev_answers, self.dev_answer_paragraphs, _ = self.dataProcessor.load_raw_dev()
-
-    def load_raw_test(self):
-        self.test_docids, self.test_questions, _, _, self.ids = self.dataProcessor.load_raw_test()
-
-    def process_data(self):
-        self.processed_qs = [self.dataProcessor.preprocess_questions_for_training(q) for q in self.questions]
-        self.processed_doc = [self.dataProcessor.preprocess_doc_for_training(text) for text in self.texts]
-        with open('processed_data.pkl', 'wb') as f:
-            pickle.dump([self.processed_qs, self.processed_doc], f)
-
-    def process_dev_data(self):
-        self.dev_processed_qs = [self.dataProcessor.preprocess_questions_for_training(q) for q in self.dev_questions]
-
-    def process_test_data(self):
-        self.test_processed_qs = [self.dataProcessor.preprocess_questions_for_training(q) for q in self.test_questions]
-
-
     def build_training_data(self):
         correct = 0
         train_num = 1
@@ -94,7 +117,7 @@ class Trainer:
         pars_vectors = []
         for i in range(train_num):
         # for i in range(len(self.processed_qs)):
-            print i, ' / ', total
+            print(i, ' / ', total)
             qs = self.processed_qs[i]
             doc_id = self.docids[i]
             answer_par_id = self.answer_paragraphs[i]
@@ -104,9 +127,9 @@ class Trainer:
                 embedding_par = self.dataProcessor.par_to_embedding(par)
                 par_vectors.append(embedding_par)
 
-            print "doc :", len(doc)
+            print("doc :", len(doc))
             ranked_pars = self.dataProcessor.get_best_par(qs, doc)
-            print "ranked_pars :", len(ranked_pars)
+            print("ranked_pars :", len(ranked_pars))
             if ranked_pars:
                 # if len(ranked_pars) > self.config.MAX_PAIR_NUM:
                 #     ranked_pars = ranked_pars[:self.config.MAX_PAIR_NUM]
@@ -120,7 +143,7 @@ class Trainer:
                             continue
                     else:
                         label = 1
-                        print answer_par_id
+                        print(answer_par_id)
                     if count_N == 0:
                         correct += 1
                     par_v = par_vectors[k]
@@ -162,11 +185,11 @@ class Trainer:
         # print len(self.labels)
         # print len(self.training_vectors)
 
-        print self.training_vectors
-        print self.labels
-        print "answer_par_id :", answer_par_id
+        print(self.training_vectors)
+        print(self.labels)
+        print("answer_par_id :", answer_par_id)
 
-        print 100.0*correct/total
+        print(100.0*correct/total)
 
     def train_answer_paragraph_selection(self):
         self.clf = MLPClassifier(activation='relu', alpha=1e-5, hidden_layer_sizes=(200, 50),verbose=1, random_state=1, shuffle=True)
@@ -193,7 +216,7 @@ class Trainer:
         len_all = len(self.dev_processed_qs)
         correct = 0
         for i in range(len(self.dev_processed_qs)):
-            print i, ' / ', len_all
+            print(i, ' / ', len_all)
             qs = self.dev_processed_qs[i]
             doc_id = self.dev_docids[i]
             answer_par_id = self.dev_answer_paragraphs[i]
@@ -230,7 +253,7 @@ class Trainer:
                 #     correct += 1
                 #     # print correct
 
-        print correct*100.0/len_all, '%'
+        print(correct*100.0/len_all, '%')
         # print 'baseline: 59.1%'
 
     def evaluateTrain(self):
@@ -249,7 +272,7 @@ class Trainer:
         correct = 0
         for i in range(train_num):
         # for i in range(len(self.processed_qs)):
-            print i, ' / ', len_all
+            print(i, ' / ', len_all)
             qs = self.processed_qs[i]
             doc_id = self.docids[i]
             answer_par_id = self.answer_paragraphs[i]
@@ -276,105 +299,19 @@ class Trainer:
                     paired_vec += self.dataProcessor.hand_crafted_features(par, qs)
                     vectors.append(paired_vec)
 
-                print "vectors :", vectors
+                print("vectors :", vectors)
                 probs = self.clf.predict_proba(vectors)
                 max_prob_ind = np.argmax([x[1] for x in probs])
                 # max_prob_ind = np.argmax(probs)
                 # print len(probs)
-                print max_prob_ind, answer_par_id
+                print(max_prob_ind, answer_par_id)
                 if max_prob_ind == answer_par_id:
                     correct += 1
-                    print correct
+                    print(correct)
 
-        print correct * 100.0 / len_all, '%'
-        print 'baseline: 59.1%'
-
-    def test_training_BM25_accuracy(self, max_tolerant_num):
-        n_accuary = defaultdict(int)
-        # total = 10
-        total = len(self.processed_qs)
-        pars_vectors = []
-        # for i in range(total):
-        for i in range(len(self.processed_qs)):
-            print i, ' / ', total
-            qs = self.processed_qs[i]
-            doc_id = self.docids[i]
-            answer_par_id = self.answer_paragraphs[i]
-            doc = self.processed_doc[doc_id]
-
-            ranked_pars = self.dataProcessor.get_best_par(qs, doc)
-
-            if ranked_pars:
-                count_N = -1
-                # print [k for k, v in ranked_pars]
-                # print answer_par_id
-                for k, val in ranked_pars:
-                    count_N += 1
-                    if count_N < max_tolerant_num:
-                        if k == answer_par_id:
-                            for m in range(max_tolerant_num, count_N, -1):
-                                n_accuary[m] += 1
-                    else:
-                        break
-
-        # print n_accuary
-        with open('training_BM25_accuracy.csv', 'wb') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            csv_writer.writerow(['total', str(total)])
-            csv_writer.writerow(['N', "correct", 'accuracy'])
-            for k, v in n_accuary.items():
-                csv_writer.writerow([str(k), str(v), str(1.0*v/total)])
-
-    def test_dev_BM25_accuracy(self, max_tolerant_num):
-        n_accuary = defaultdict(int)
-        # total = 10
-        total = len(self.dev_processed_qs)
-        pars_vectors = []
-        # for i in range(total):
-        for i in range(len(self.dev_processed_qs)):
-            print i, ' / ', total
-            qs = self.dev_processed_qs[i]
-            doc_id = self.dev_docids[i]
-            answer_par_id = self.dev_answer_paragraphs[i]
-            doc = self.processed_doc[doc_id]
-
-            ranked_pars = self.dataProcessor.get_best_par(qs, doc)
-
-            if ranked_pars:
-                count_N = -1
-                # print [k for k, v in ranked_pars]
-                # print answer_par_id
-                for k, val in ranked_pars:
-                    count_N += 1
-                    if count_N < max_tolerant_num:
-                        if k == answer_par_id:
-                            for m in range(max_tolerant_num, count_N, -1):
-                                n_accuary[m] += 1
-                    else:
-                        break
-
-        # print n_accuary
-        with open('dev_BM25_accuracy.csv', 'wb') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            csv_writer.writerow(['total', str(total)])
-            csv_writer.writerow(['N', "correct", 'accuracy'])
-            for k, v in n_accuary.items():
-                csv_writer.writerow([str(k), str(v), str(1.0*v/total)])
+        print(correct * 100.0 / len_all, '%')
+        print('baseline: 59.1%')
 
 if __name__ == '__main__':
-    trainer = Trainer()
-    # with open('training_vectors.pkl', 'rb') as f:
-    #     x = pickle.load(f)
-    # with open('training_vectors2.pkl', 'rb') as f:
-    #     y = pickle.load(f)
-    # x += y
-    # with open('training_vectors3.pkl', 'wb') as f:
-    #     pickle.dump(x, f)
-
-    # with open('training_vectors3.pkl', 'rb') as f:
-    #     x = pickle.load(f)
-    #     for a in x:
-    #         print a
-    # trainer.train_word2vec_model()
-    # trainer = Trainer(mode)
+    train_based_QA = TrainBasedQA()
 

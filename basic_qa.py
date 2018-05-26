@@ -18,6 +18,8 @@ class Basic_QA:
         self.config = self.dataProcessor.config
         self.ruleBasedClassifier = RuleBasedClassifier(self.config)
         self.load_raw_doc()
+        self.load_raw_dev()
+        self.test_on_all_dev_qs()
         if enhance:
             self.dataProcessor.load_word2vec_model()
             self.dataProcessor.load_qtype_model()
@@ -39,7 +41,7 @@ class Basic_QA:
             csv_writer = csv.writer(csvfile)
             csv_writer.writerow(['id', 'answer'])
             for i in range(len(self.test_ids)):
-                print i, " / ", len(self.test_ids)
+                print(i, " / ", len(self.test_ids))
                 test_id = self.test_ids[i]
                 test_qs = self.test_questions[i]
                 test_docid = self.test_docids[i]
@@ -61,7 +63,7 @@ class Basic_QA:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['id', 'answer'])
             for i in range(len(self.test_wikis)):
-                print i
+                print(i)
                 test_wiki = self.test_wikis[i]
                 test_qs = self.test_questions[i]
                 processed_test_qs = self.dataProcessor.preprocess_questions(test_qs)
@@ -76,10 +78,10 @@ class Basic_QA:
                         dep_q = dep_qs[j]
                         q_vec = self.dataProcessor.q_to_vec(q, dep_q)
                         probs = self.dataProcessor.qtype_model.predict_proba([q_vec])[0]
-                        p = zip(classes, probs)
+                        p = list(zip(classes, probs))
                         p = sorted(p, key=lambda x: x[1], reverse=True)
                         type_rank = [x[0] for x in p]
-                        print type_rank
+                        print(type_rank)
                     answer, types, predicted_ind = self.process_query_on_wiki_bm25(q, processed_test_wiki, ner_test_wiki, split_raw_wiki, type_rank, q_type)
                     csv_writer.writerow([total, answer])
                 total += 1
@@ -90,12 +92,13 @@ class Basic_QA:
         correct = 0
         correct_id = 0
         total = len(self.dev_questions)
+        # total = len(self.dev_questions)
         with open('dev.csv', 'wb') as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['W/R', 'query', 'predicted_id', 'actual_id', 'predicted_answer', 'actual_answer', 'predicted_answer_type'])
-            # for i in range(20):
-            for i in range(len(self.dev_questions)):
-                print i, " / ", len(self.dev_questions)
+            # for i in range(len(self.dev_questions)):
+            for i in range(3,5):
+                # print(i, " / ", len(self.dev_questions))
 
                 dev_qs = self.dev_questions[i]
                 doc_id = self.dev_docids[i]
@@ -118,13 +121,13 @@ class Basic_QA:
                     correct += 1
                 else:
                     csv_writer.writerow(["##wrong##", dev_qs, predicted_id, dev_answer_par_id, answer,  dev_answer, types])
-                # print dev_answer, " ; ", answer
+                # print(dev_answer, " ; ", answer)
                 # print "correct :", correct
-            csv_writer.writerow([str(correct)])
-            csv_writer.writerow([str(correct_id)])
+            csv_writer.writerow([str(correct), str(correct * 100.0 / total)])
+            csv_writer.writerow([str(correct_id), str(correct_id * 100.0 / total)])
             csv_writer.writerow([str(total)])
-        print correct*100.0/total
-        print correct_id*100.0/total
+        print(correct*100.0/total)
+        print(correct_id*100.0/total)
 
 
     def enhance_test_on_all_dev_qs(self, save=True):
@@ -136,7 +139,7 @@ class Basic_QA:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['query', 'predicted_ind', 'predicted_answer', 'actual_ind', 'actual_answer', 'predicted_answer_type'])
             for i in range(len(self.dev_wikis)):
-                print i
+                print(i)
                 dev_wiki = self.dev_wikis[i]
                 dev_qs = self.dev_questions[i]
                 dev_answer_inds = self.dev_answer_inds[i]
@@ -145,7 +148,7 @@ class Basic_QA:
                 dep_qs = self.dataProcessor.dep_parse_sents(processed_dev_qs)
                 split_raw_wiki, ner_dev_wiki, processed_dev_wiki = self.dataProcessor.preprocess_wiki(dev_wiki)
                 for j in range(len(processed_dev_qs)):
-                    print total
+                    print(total)
                     raw_q = dev_qs[j]
                     q = processed_dev_qs[j]
                     wh = self.ruleBasedClassifier.extract_wh_word(q)
@@ -154,7 +157,7 @@ class Basic_QA:
                         dep_q = dep_qs[j]
                         q_vec = self.dataProcessor.q_to_vec(q, dep_q)
                         probs = self.dataProcessor.qtype_model.predict_proba([q_vec])[0]
-                        p = zip(classes, probs)
+                        p = list(zip(classes, probs))
                         prob_dict = defaultdict(float)
                         for c, prob in p:
                             prob_dict[c] = prob
@@ -162,7 +165,7 @@ class Basic_QA:
                             tmp = prob_dict['O']
                             prob_dict['O'] = prob_dict['OTHER']
                             prob_dict['OTHER'] = tmp
-                        p = prob_dict.items()
+                        p = list(prob_dict.items())
                         p = sorted(p, key=lambda x: x[1], reverse=True)
                         answer, types, predicted_ind = self.enhance_process_query_on_wiki_bm25(p, q, processed_dev_wiki, ner_dev_wiki, split_raw_wiki, q_type)
                     else:
@@ -175,7 +178,7 @@ class Basic_QA:
                     if actual_answer == answer:
                         correct += 1
                     total += 1
-        print correct*100.0/total
+        print(correct*100.0/total)
 
 
     def enhance_process_query_on_wiki_bm25(self, type_probs, query, wiki, ner_wiki, split_raw_wiki, q_type):
@@ -186,7 +189,7 @@ class Basic_QA:
         for ind, bm in ranked_docs:
             for type, prob in type_probs:
                 doc_type_prob_dict[(ind, type)] = bm*prob
-        doc_type_prob_pairs = sorted(doc_type_prob_dict.items(), key=lambda x:x[1], reverse=True)
+        doc_type_prob_pairs = sorted(list(doc_type_prob_dict.items()), key=lambda x:x[1], reverse=True)
         doc_type_prob_pairs = [x[0] for x in doc_type_prob_pairs]
         best_entity, types, doc_ind = self.rank_entities_from_answer_doc_prob_priority(doc_type_prob_pairs, query,
                                                                                            ner_wiki, wiki,
@@ -212,9 +215,9 @@ class Basic_QA:
         doc_score_dict = defaultdict(float)
         for term in set(query):
             tfidf_dict = wiki_inv_dict[term]
-            for doc, tfidf in tfidf_dict.items():
+            for doc, tfidf in list(tfidf_dict.items()):
                 doc_score_dict[doc] += tfidf
-        ranked_docs = sorted(doc_score_dict.items(), key=lambda x: x[1], reverse=True)
+        ranked_docs = sorted(list(doc_score_dict.items()), key=lambda x: x[1], reverse=True)
         if not ranked_docs:
             return -1
         # print ranked_docs
@@ -266,11 +269,10 @@ class Basic_QA:
 
     def rank_entites_by_open_class_dist(self, type, type_entity_dict, query, entities, groups, raw_doc, qtype=None):
         #问题中所有有意义的词
+        print(raw_doc)
         open_class_query = self.dataProcessor.remove_stop_words(query)
-        # print "open_class_query :", open_class_query
-        # print "entities :", entities
         doc_words_entities = [self.dataProcessor.lemmatize(tup[0]) for tup in entities]
-        # print "doc_words_entities :", doc_words_entities
+        # print(doc_words_entities)
         assert type_entity_dict[type]
         # print "type_entity_dict :", type_entity_dict
         open_word_ind = []
@@ -279,13 +281,14 @@ class Basic_QA:
         raw_type_entity_spans = [x[0] for x in type_entities]
         #所有想要词性的答案中的词
         raw_type_entity_spans = self.dataProcessor.remove_stop_words(raw_type_entity_spans)
-        # print "raw_type_entity_spans :", raw_type_entity_spans
+
+        # print(raw_type_entity_spans)
         if type == 'O':
             raw_type_entity_spans = [x[0] for x in pos_tag(raw_type_entity_spans) if 'NN' in x[1]]
         dists = []
         js = []
 
-        # print open_class_query
+        # print(open_class_query)
         for open_class_word in open_class_query:
             # if open_word_ind:
             #     break
@@ -294,7 +297,6 @@ class Basic_QA:
                     word = doc_words_entities[i]
                     if word.lower() == open_class_word.lower():
                         open_word_ind.append(i)
-        # print "entities :", entities
         for entity in raw_type_entity_spans:
             for j in range(len(entities)):
                 word = entities[j][0]
@@ -380,7 +382,7 @@ class Basic_QA:
         for doc_ind, type in ranked_doc_type_probs:
             ner_doc = ner_docs[doc_ind]
             raw_doc = split_raw_docs[doc_ind]
-            if not entities_dict.has_key(doc_ind):
+            if doc_ind not in entities_dict:
                 groups = self.combine_entity(ner_doc)
                 entities = self.process_groups_into_entites(groups)
                 entities_dict[doc_ind] = entities
@@ -408,6 +410,7 @@ class Basic_QA:
             assert len(raw_par) == len(ner_par)
             candidates_phase1, filtered_phase1 = self.filter_existing_content(
                 self.dataProcessor.lower_sent(query), entities)
+            # print(candidates_phase1)
             for type in type_rank:
 
                 candidates_phase2_dict = self.compute_entity_dict_by_type(candidates_phase1)

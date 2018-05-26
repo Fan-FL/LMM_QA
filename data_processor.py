@@ -10,10 +10,10 @@ from nltk.corpus import stopwords
 import re
 from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tag.stanford import StanfordNERTagger
+from nltk.tag.stanford import StanfordPOSTagger
 from string import punctuation
 from nltk import word_tokenize
 from nltk.parse.stanford import StanfordDependencyParser
-from nltk.tag.stanford import StanfordPOSTagger
 import math
 import codecs
 import pickle
@@ -21,17 +21,17 @@ from math import log
 from gensim.models.keyedvectors import KeyedVectors
 from string import punctuation
 from nltk import pos_tag, pos_tag_sents
-
+from nltk.parse.corenlp import CoreNLPParser
 
 class DataProcessor:
     def __init__(self):
         self.config = Config()
         self.stops = set(stopwords.words("english"))
-        self.lmtzr = WordNetLemmatizer()
+        self.lemmatizer = WordNetLemmatizer()
         self.tagger = StanfordNERTagger(model_filename=self.config.ner_model_path, path_to_jar=self.config.ner_jar_path)
         self.postagger = StanfordPOSTagger(path_to_jar=self.config.pos_jar_path, model_filename=self.config.pos_model_path)
-        self.dependency_parser = StanfordDependencyParser(path_to_jar=self.config.parser_jar_path,
-                                                          path_to_models_jar=self.config.parser_model_path)
+        # self.dependency_parser = CoreNLPParser(path_to_jar=self.config.parser_jar_path,
+        #                                                   path_to_models_jar=self.config.parser_model_path)
 
 # *********************************** FOR LOAD DATA & MODELS *********************************************
 
@@ -57,7 +57,7 @@ class DataProcessor:
 
     def load_json(self, file_name):
         f = codecs.open(file_name, 'rb', encoding='utf-8')
-        print file_name + ' done'
+        print(file_name + ' done')
         data = json.load(f)
         questions = list()
         docids = list()
@@ -84,9 +84,9 @@ class DataProcessor:
 
     def lemmatize(self, word):
         word = word.lower()
-        lemma = self.lmtzr.lemmatize(word, 'v')
+        lemma = self.lemmatizer.lemmatize(word, 'v')
         if lemma == word:
-            lemma = self.lmtzr.lemmatize(word, 'n')
+            lemma = self.lemmatizer.lemmatize(word, 'n')
         return lemma
 
     def lemmatize_sent(self, words):
@@ -142,7 +142,7 @@ class DataProcessor:
         return ''.join([x for x in token if x not in punctuation]).strip()
 
     def preprocess_doc(self, doc):
-        raw_split = [word_tokenize(sent.replace(u"\u200b",'')) for sent in doc]
+        raw_split = [word_tokenize(sent.replace("\u200b",'')) for sent in doc]
         remove_pure_punc = [[token for token in sent if not self.is_all_puncs(token)] for sent in raw_split]
         remove_punc_in_words = [[self.remove_punc_in_token(token) for token in sent] for sent in remove_pure_punc]
         ner = self.ner_tagging(remove_punc_in_words)
@@ -152,7 +152,7 @@ class DataProcessor:
         return remove_pure_punc, ner, lemmatized
 
     def preprocess_doc_for_training(self, text):
-        raw_split = [word_tokenize(par.replace(u"\u200b",'').replace(u"\u2014",'')) for par in text]
+        raw_split = [word_tokenize(par.replace("\u200b",'').replace("\u2014",'')) for par in text]
         remove_pure_punc = [[token for token in sent if not self.is_all_puncs(token)] for sent in raw_split]
         remove_punc_in_words = [[self.remove_punc_in_token(token) for token in sent] for sent in remove_pure_punc]
         lower = [self.lower_sent(sent) for sent in remove_punc_in_words]
@@ -161,7 +161,7 @@ class DataProcessor:
         return lemmatized
 
     def preprocess_questions_for_training(self, question):
-        raw_split = word_tokenize(question.replace(u"\u200b", '').replace(u"\u2014", ''))
+        raw_split = word_tokenize(question.replace("\u200b", '').replace("\u2014", ''))
         remove_pure_punc = [token for token in raw_split if not self.is_all_puncs(token)]
         remove_punc_in_words = [self.remove_punc_in_token(token) for token in remove_pure_punc]
         lower = self.lower_sent(remove_punc_in_words)
@@ -179,14 +179,14 @@ class DataProcessor:
         return lemmatized
 
     def preprocess_questions(self, raw_qs):
-        raw_split = word_tokenize(raw_qs.replace(u"\u200b", '').replace(u"\u2014", ''))
+        raw_split = word_tokenize(raw_qs.replace("\u200b", '').replace("\u2014", ''))
         remove_pure_punc = [token for token in raw_split if not self.is_all_puncs(token)]
         remove_punc_in_words = [self.remove_punc_in_token(token) for token in remove_pure_punc]
         lemmatized = self.lemmatize_sent(remove_punc_in_words)
         return lemmatized
 
     def preprocess_answers(self, answers):
-        raw_split = [word_tokenize(sent.replace(u"\u200b", '')) for sent in answers]
+        raw_split = [word_tokenize(sent.replace("\u200b", '')) for sent in answers]
         remove_pure_punc = [[token for token in sent if not self.is_all_puncs(token)] for sent in raw_split]
         remove_punc_in_words = [[self.remove_punc_in_token(token) for token in sent] for sent in remove_pure_punc]
         ner = self.ner_tagging(remove_punc_in_words)
@@ -281,7 +281,7 @@ class DataProcessor:
         for j in range(N):
             doc = wiki[j]
             for term in doc:
-                if not tf_dict[term].has_key(j):
+                if j not in tf_dict[term]:
                     tf_dict[term][j] = 0
                 tf_dict[term][j] += 1
             for term in set(doc):
@@ -314,7 +314,7 @@ class DataProcessor:
         probs = self.clf.predict_proba(q_vs)
         probs_true = [x[1] for x in probs]
         indexs = [i for i in range(len(probs_true))]
-        prob_inds = zip(probs_true, indexs)
+        prob_inds = list(zip(probs_true, indexs))
         ranks = sorted(prob_inds, key=lambda x:x[0], reverse=True)
         ranks = [rank[1] for rank in ranks]
         return ranks
@@ -342,7 +342,7 @@ class DataProcessor:
         for j in range(pars_count):
             par = doc[j]
             for term in par:
-                if j not in tf_par_dict[term].keys():
+                if j not in list(tf_par_dict[term].keys()):
                     tf_par_dict[term][j] = 0
                 tf_par_dict[term][j] += 1
             for term in set(par):
@@ -355,12 +355,12 @@ class DataProcessor:
             acc_bm25_score = 0.0
             par_Length = len(doc[i])
             for term in query:
-                if term in idf_dict.keys():
+                if term in list(idf_dict.keys()):
                     ft = idf_dict[term]
                 else:
                     ft = 0
-                if term in tf_par_dict.keys():
-                    if i in tf_par_dict[term].keys():
+                if term in list(tf_par_dict.keys()):
+                    if i in list(tf_par_dict[term].keys()):
                         fdt = tf_par_dict[term][i]
                     else:
                         fdt = 0
@@ -369,7 +369,7 @@ class DataProcessor:
                 fqt = tf_query_dict[term]
                 acc_bm25_score += self.bm25_score(pars_count, ft, fdt, fqt, par_Length, parLength_avg)
             acc_bm25_dict[i] = acc_bm25_score
-        sorted_acc_bm25_dict = sorted(acc_bm25_dict.items(), key=lambda item: item[1], reverse=True)
+        sorted_acc_bm25_dict = sorted(list(acc_bm25_dict.items()), key=lambda item: item[1], reverse=True)
         return sorted_acc_bm25_dict
 
     # calculate bm25 scores of a word in a query with a document
@@ -429,7 +429,7 @@ class DataProcessor:
             if tag != 'O':
                 tag_dict[tag] += 1
         if tag_dict:
-            max_tag = max(tag_dict.items(), key=lambda x:x[1])
+            max_tag = max(list(tag_dict.items()), key=lambda x:x[1])
             return max_tag[0]
         else:
             return 'O'
