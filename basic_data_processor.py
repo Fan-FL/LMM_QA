@@ -13,6 +13,8 @@ from data import Data
 from config import Config
 from nltk.parse.stanford import StanfordDependencyParser
 from stanfordcorenlp import StanfordCoreNLP
+from nltk.tree import Tree
+import nltk
 
 class BasicDataProcessor:
     def __init__(self, config, data):
@@ -30,14 +32,26 @@ class BasicDataProcessor:
 
         self.punc = r"""!"#&'()*+;<=>?[]^`{}~"""
 
-        text = ('5-Aug-25')
+        # # text = ('5-Aug-25')
         # text = ('GOP Sen. Rand Paul was assaulted in his home in Bowling Green, Kentucky, on Friday, '
         #         'according to Kentucky State Police. State troopers responded to a call to the senator\'s '
         #         'residence at 3:21 p.m. Friday. Police arrested a man named Rene Albert Boucher, who they '
         #         'allege "intentionally assaulted" Paul, causing him "minor injury". Boucher, 59, of Bowling '
         #         'Green was charged with one count of fourth-degree assault. As of Saturday afternoon, he '
         #         'was being held in the Warren County Regional Jail on a $5,000 bond.')
-        print('Named Entities:', self.nlp.ner(text))
+        # aaa = self.nlp.parse(text)
+        #
+        # tree = nltk.tree.Tree.fromstring(aaa)
+        # self.traverse_tree(tree)
+
+    def traverse_tree(self, tree):
+        # print("tree:", tree)
+        for subtree in tree:
+            if type(subtree) == nltk.tree.Tree:
+                self.traverse_tree(subtree)
+            print(type(subtree))
+
+
 
 
 

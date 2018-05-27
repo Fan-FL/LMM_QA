@@ -254,7 +254,7 @@ class RuleBasedQA:
                 csv_writer.writerow([test_id, answer])
         # print(correct * 100.0 / total)
         # print(correct_id * 100.0 / total)
-        # print("best : 12.399095899257345")
+        # print("best : 16.209234743299966")
 
     def preprocess_doc_for_rule(self, doc):
         normal_tokens = [word_tokenize(par.replace("\u200b",'').replace("\u2014",'')) for par in doc]

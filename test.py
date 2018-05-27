@@ -1,4 +1,3 @@
 from nltk import pos_tag
-aa = 'what percentage'
-if 'what percent' in aa:
-    print("aaaaaaa")
+import time
+print('dev_result' + time.strftime('%Y-%m-%d%H:%M:%S', time.localtime(time.time())) + '.csv')

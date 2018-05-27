@@ -1,7 +1,15 @@
 from config import Config
+from data_processor import DataProcessor
+import sklearn
+from sklearn.neural_network import MLPClassifier
+from gensim.models import Word2Vec
+from nltk.corpus import brown, movie_reviews, treebank
 import numpy as np
+from numpy import ndarray as nd
+import sys
 import pickle
 from collections import defaultdict
+from sklearn import svm
 import unicodecsv as csv
 from file_loader import FileLoader
 from data import Data
@@ -11,7 +19,6 @@ from nltk import word_tokenize
 from nltk import pos_tag
 from nltk.corpus import stopwords
 from nltk import sent_tokenize
-import time
 
 class RuleBasedQA:
     def __init__(self):
@@ -51,7 +58,21 @@ class RuleBasedQA:
         self.cause_of_death = ['CAUSE_OF_DEATH']
         self.other = ['SET', "MISC", 'EMAIL', 'URL', 'TITLE', 'IDEOLOGY', 'CRIMINAL_CHARGE']
 
+        # self.dataProcessor = DataProcessor()
+        # self.dataProcessor.load_word2vec_model()
+
+        # print(self.preprocess_questions("What location"))
+
         self.fileLoader.load_doc()
+
+        # if load_processed_doc:
+        #     if load_doc_from_pkl:
+        #         with open(self.config.doc_processed_path, 'rb') as f:
+        #             self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens, self.data.doc_ner_sents, self.data.doc_processed = pickle.load(f)
+        #     else:
+        #         self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens, self.data.doc_ner_sents, self.data.doc_processed = self.bdp.process_docs(self.data.doc_texts)
+        #         with open(self.config.doc_processed_path, 'wb') as f:
+        #             pickle.dump([self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens, self.data.doc_ner_sents, self.data.doc_processed], f)
 
         if load_processed_doc:
             if load_doc_from_pkl:
@@ -76,13 +97,9 @@ class RuleBasedQA:
 
             if test_BM25:
                 self.bm25.test_training_BM25_accuracy(10)
-                return
 
             if train_sens_embedding:
                 self.bdp.train_sens_embeddings()
-
-            self.predict_with_bm25_pars_sents(0)
-            # self.predict_with_bm25_sents(0)
 
         if dev:
             self.fileLoader.load_dev_data()
@@ -97,8 +114,7 @@ class RuleBasedQA:
                 self.test_BM25_par()
                 return
 
-            # self.predict_with_bm25_pars_sents(1)
-            self.predict_with_bm25_sents(1)
+            self.answer_dev()
 
         if test:
             self.fileLoader.load_test_data()
@@ -110,8 +126,91 @@ class RuleBasedQA:
                 with open(self.config.test_qs_processed_path, 'wb') as f:
                     pickle.dump(self.data.test_qs_processed, f)
 
-            self.predict_with_bm25_pars_sents(2)
-            # self.predict_with_bm25_sents(2)
+
+    def answer_dev(self, save=True):
+        correct = 0
+        correct_id = 0
+        total = int(len(self.data.dev_questions))
+        # total = 6
+        doc_temp = {}
+
+        with open('dev.csv', 'wb') as csv_file:
+            csv_writer = csv.writer(csv_file)
+            csv_writer.writerow(['W/R', 'query', 'predicted_id', 'actual_id', 'predicted_answer', 'actual_answer',
+                                 'predicted_answer_type', 'predicated_candidates'])
+            for i in range(total):
+            # for i in range(20):
+                print(i, " / ", total)
+
+                dev_qs = self.data.dev_questions[i]
+                doc_id = self.data.dev_doc_ids[i]
+                dev_doc = self.data.doc_texts[doc_id]
+                dev_answer = self.data.dev_answers[i]
+                dev_answer_par_id = self.data.dev_answer_par_ids[i]
+                dev_qs_processed = self.preprocess_questions(dev_qs)
+                doc_processed = self.data.doc_processed[doc_id]
+
+                doc_entities = []
+                if doc_id in doc_temp:
+                    doc_entities = doc_temp[doc_id]
+                else:
+                    for par in dev_doc:
+                        par_entities = []
+                        sent_text = sent_tokenize(par)
+                        for sent in sent_text:
+                            par_entities.append(self.ner_process(sent))
+                        doc_entities.append(par_entities)
+                    doc_temp[doc_id] = doc_entities
+
+                wh = self.extract_wh_word(dev_qs_processed)
+                possible_qs_type_rank, qs_type = self.identify_question_type(wh, dev_qs_processed)
+                answer = 'unknown'
+                answer_types = []
+                pred_par_id = -1
+                candidate_answers = ''
+                if possible_qs_type_rank:
+                    self.bm25.k1 = 1.2
+                    self.bm25.b = 0.75
+                    bm25_rank = self.bm25.sort_by_bm25_score(dev_qs_processed, doc_processed)
+                    bm25_rank_par_ids = [x[0] for x in bm25_rank]
+                    for par_id in bm25_rank_par_ids:
+                        par_text = dev_doc[par_id]
+                        sents_text = sent_tokenize(par_text)
+                        sent_tokens = self.bdp.preprocess_doc(sents_text)
+                        bm25_sent_tokens_rank = self.bm25.sort_by_bm25_score(dev_qs_processed, sent_tokens)
+                        bm25_sent_tokens_rank_ids = [x[0] for x in bm25_sent_tokens_rank]
+                        for sent_id in bm25_sent_tokens_rank_ids:
+                            par_answer, par_answer_types, par_candidate_answers = self.pred_answer_type(par_id, doc_entities[par_id][sent_id],
+                                                                                                        dev_qs_processed,
+                                                                                possible_qs_type_rank,
+                                                                                qs_type)
+                            if par_answer != -1:
+                                answer = par_answer
+                                answer_types = par_answer_types
+                                pred_par_id = par_id
+                                candidate_answers = '; '.join(par_candidate_answers)
+                                break
+                        if par_answer != -1:
+                            break
+                types = ' '.join(answer_types)
+                if pred_par_id == int(dev_answer_par_id):
+                    correct_id += 1
+                if dev_answer == answer:
+                    csv_writer.writerow(
+                        ["##right##", dev_qs, pred_par_id, dev_answer_par_id, answer, dev_answer, types, candidate_answers])
+                    correct += 1
+                else:
+                    csv_writer.writerow(
+                        ["##wrong##", dev_qs, pred_par_id, dev_answer_par_id, answer, dev_answer, types, candidate_answers])
+                print(dev_answer, " ; ", answer)
+                # print "correct :", correct
+            csv_writer.writerow([str(correct), str(correct * 100.0 / total)])
+            csv_writer.writerow([str(correct_id), str(correct_id * 100.0 / total)])
+            csv_writer.writerow([str(total)])
+        print(correct * 100.0 / total)
+        print(correct_id * 100.0 / total)
+        print("best : 12.399095899257345")
+
 
     def preprocess_doc_for_rule(self, doc):
         normal_tokens = [word_tokenize(par.replace("\u200b",'').replace("\u2014",'')) for par in doc]
@@ -191,8 +290,6 @@ class RuleBasedQA:
         elif wh == 'who' or wh == 'whom':
             return ['PERSON', 'ORGANIZATION', 'OTHER'], 'person'
         elif wh == 'where':
-            if 'headquarter' in raw_q_sent or 'capital' in raw_q_sent:
-                return ['CITY'], 'headquarter'
             return ['LOCATION', 'ORDINAL', 'OTHER'], 'location'
         elif wh == 'how':
             if 'old' in raw_q_sent or 'large' in raw_q_sent:
@@ -216,11 +313,7 @@ class RuleBasedQA:
                 return ['NATIONALITY'], 'language'
             if 'which year' in raw_q_sent:
                 return ['TIME', 'NUMBER'], 'year'
-            if 'which country' in raw_q_sent:
-                return ['COUNTRY'], 'country'
-            if 'which city' in raw_q_sent:
-                return ['CITY'], 'country'
-            if 'place' in raw_q_sent or 'location' in raw_q_sent or 'site' in raw_q_sent:
+            if 'place' in raw_q_sent or 'country' in raw_q_sent or 'city' in raw_q_sent or 'location' in raw_q_sent or 'site' in raw_q_sent:
                 return ['LOCATION', 'ORGANIZATION', 'OTHER', 'PERSON'], 'place'
             if 'person' in raw_q_sent:
                 return ['PERSON', 'ORGANIZATION', 'OTHER', 'LOCATION'], 'person'
@@ -233,7 +326,7 @@ class RuleBasedQA:
         else:
             return ['O', 'OTHER', 'LOCATION', 'PERSON', 'NUMBER'], 'else'
 
-    def pred_answer_type(self, entities, qs_processed,
+    def pred_answer_type(self, par_id, entities, qs_processed,
                                          possible_qs_type_rank, qs_type):
 
 
@@ -486,7 +579,7 @@ class RuleBasedQA:
         for tup in ner_par:
             tup = list(tup)
             if tup[1] in self.other:
-                tup[1] = 'O'
+                tup[1] = 'OTHER'
             tup[0] = self.bdp.remove_punc_in_token_for_rule(tup[0])
             original_ner.append(tup)
         original_ner = self.get_combined_entities(original_ner)
@@ -515,30 +608,24 @@ class RuleBasedQA:
         best_accuracy = 0
         best_k1 = 0.1
         best_b = 0.1
-        fname = 'bm25_dev_' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        with open(fname, 'wb') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            csv_writer.writerow(["k1", 'b'])
-            for i in range(21):
-                for j in range(21):
-                    print(str(k1), str(b))
-                    # fname = 'training_BM25_accuracy' + str(n) + str('.csv')
-                    # print(fname)
-                    # n += 1
-                    self.bm25.k1 = k1
-                    self.bm25.b = b
-                    acc = self.bm25.test_dev_BM25_accuracy(2)
-                    if acc > best_accuracy:
-                        best_accuracy = acc
-                        best_k1 = k1
-                        best_b = b
-                    csv_writer.writerow([k1, b, acc])
-                    b += 0.1
-                k1 += 0.1
-                b = 0.1
-            csv_writer.writerow(["best"])
-            csv_writer.writerow([best_accuracy, best_k1, best_b])
-        print(str(best_accuracy), str(best_k1), str(best_b))
+        for i in range(20):
+            for j in range(20):
+                print(str(k1), str(b))
+                # fname = 'training_BM25_accuracy' + str(n) + str('.csv')
+                # print(fname)
+                # n += 1
+                self.bm25.k1 = best_k1
+                self.bm25.b = best_b
+                acc = self.bm25.test_dev_BM25_accuracy(2)
+                if acc > best_accuracy:
+                    best_accuracy = acc
+                    best_k1 = k1
+                    best_b = b
+                b += 0.1
+            k1 += 0.1
+            b = 0.1
+        # self.bm25.test_dev_BM25_accuracy(10, 'training_BM25_accuracy.csv')
+        print(str(best_accuracy), str(k1), str(b))
         return
 
     def test_BM25_sent(self):
@@ -567,246 +654,6 @@ class RuleBasedQA:
         # self.bm25.test_dev_BM25_accuracy(10, 'training_BM25_accuracy.csv')
         print(str(best_accuracy), str(k1), str(b))
         return
-
-    def predict_with_bm25_sents(self, type):
-        correct = 0
-        correct_id = 0
-        doc_entity_temp = {}
-        doc_text_temp = {}
-        doc_all = self.data.doc_texts
-        qs_all = []
-        doc_id_all = []
-        answer_all = []
-        answer_par_id_all = []
-        if type == 0:  # train
-            qs_all = self.data.train_questions
-            doc_id_all = self.data.train_doc_ids
-            answer_all = self.data.train_answers
-            answer_par_id_all = self.data.train_answer_par_ids
-            fname = 'train_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        elif type == 1:  # dev
-            qs_all = self.data.dev_questions
-            doc_id_all = self.data.dev_doc_ids
-            answer_all = self.data.dev_answers
-            answer_par_id_all = self.data.dev_answer_par_ids
-            fname = 'dev_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        else:  # test
-            qs_all = self.data.test_questions
-            doc_id_all = self.data.test_doc_ids
-            test_ids = self.data.test_ids
-            fname = 'test_results_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        total = int(len(qs_all))
-        with open(fname, 'wb') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            if type == 0 or type == 1:
-                csv_writer.writerow(
-                    ['W/R', 'query', 'predicted_id_R/W', 'actual_id', 'predicted_answer', 'actual_answer',
-                     'predicted_answer_type', 'predicated_candidates'])
-            else:
-                csv_writer.writerow(['id', 'answer'])
-            for i in range(total):
-            # for i in range(20):
-                print(i, " / ", total)
-
-                qs = qs_all[i]
-                doc_id = doc_id_all[i]
-                doc = doc_all[doc_id]
-                if type == 0 or type == 1:
-                    answer = answer_all[i]
-                    answer_par_id = answer_par_id_all[i]
-                qs_processed = self.preprocess_questions(qs)
-                doc_processed = self.data.doc_processed[doc_id]
-
-                doc_entities = []
-                doc_sents_text = []
-                if doc_id in doc_entity_temp:
-                    doc_entities = doc_entity_temp[doc_id]
-                    doc_sents_text = doc_text_temp[doc_id]
-                else:
-                    for par in doc:
-                        sents_text = sent_tokenize(par)
-                        doc_sents_text += sents_text
-                        for sent in sents_text:
-                            doc_entities.append(self.ner_process(sent))
-                    doc_entity_temp[doc_id] = doc_entities
-                    doc_text_temp[doc_id] = doc_sents_text
-
-                wh = self.extract_wh_word(qs_processed)
-                possible_qs_type_rank, qs_type = self.identify_question_type(wh, qs_processed)
-                pred_answer = 'unknown'
-                answer_types = []
-                pred_sent_id = -1
-                pred_par_id = -1
-                candidate_answers = ''
-                if possible_qs_type_rank:
-                    self.bm25.k1 = 1.2
-                    self.bm25.b = 0.75
-                    sent_tokens = self.bdp.preprocess_doc(doc_sents_text)
-                    bm25_sent_tokens_rank = self.bm25.sort_by_bm25_score(qs_processed, sent_tokens)
-                    bm25_sent_tokens_rank_ids = [x[0] for x in bm25_sent_tokens_rank]
-                    for sent_id in bm25_sent_tokens_rank_ids:
-                        temp_answer, temp_answer_types, temp_candidate_answers = self.pred_answer_type(doc_entities[sent_id],
-                                                                                                     qs_processed,
-                                                                                                     possible_qs_type_rank,
-                                                                                                     qs_type)
-                        if temp_answer != -1:
-                            pred_answer = temp_answer
-                            answer_types = temp_answer_types
-                            pred_sent_id = sent_id
-                            candidate_answers = '; '.join(temp_candidate_answers)
-                            break
-                if type == 0 or type == 1:
-                    if pred_sent_id != -1:
-                        for par_id in range(len(doc)):
-                            if doc_sents_text[pred_sent_id] in doc[par_id]:
-                                pred_par_id = par_id
-                                break
-                    candidate_answers = '; '.join(temp_candidate_answers)
-
-                    types = ' '.join(answer_types)
-                    if pred_par_id == answer_par_id:
-                        correct_id += 1
-                    if answer == pred_answer:
-                        csv_writer.writerow(
-                            ["##right##", qs, pred_par_id, answer_par_id, pred_answer, answer, types,
-                             candidate_answers])
-                        correct += 1
-                    else:
-                        csv_writer.writerow(
-                            ["##wrong##", qs, pred_par_id, answer_par_id, pred_answer, answer, types,
-                             candidate_answers])
-                    print(answer, " ; ", pred_answer)
-                    # print "correct :", correct
-                else:
-                    csv_writer.writerow([test_ids[i], pred_answer])
-            if type == 0 or type == 1:
-                csv_writer.writerow([str(correct), str(correct * 100.0 / total)])
-                csv_writer.writerow([str(correct_id), str(correct_id * 100.0 / total)])
-                csv_writer.writerow([str(total)])
-                print(correct * 100.0 / total)
-                print(correct_id * 100.0 / total)
-                print("best : 12.399095899257345")
-
-    def predict_with_bm25_pars_sents(self, type):
-        correct = 0
-        correct_id = 0
-        doc_entity_temp = {}
-        doc_text_temp = {}
-        doc_all = self.data.doc_texts
-        qs_all = []
-        doc_id_all = []
-        answer_all = []
-        answer_par_id_all = []
-        if type == 0: # train
-            qs_all = self.data.train_questions
-            doc_id_all = self.data.train_doc_ids
-            answer_all = self.data.train_answers
-            answer_par_id_all = self.data.train_answer_par_ids
-            fname = 'train_result_pars_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        elif type == 1: # dev
-            qs_all = self.data.dev_questions
-            doc_id_all = self.data.dev_doc_ids
-            answer_all = self.data.dev_answers
-            answer_par_id_all = self.data.dev_answer_par_ids
-            fname = 'dev_result_pars_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        else: #test
-            qs_all = self.data.test_questions
-            doc_id_all = self.data.test_doc_ids
-            test_ids = self.data.test_ids
-            fname = 'test_results_pars_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        total = int(len(qs_all))
-        with open(fname, 'wb') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            if type == 0 or type == 1:
-                csv_writer.writerow(
-                    ['W/R', 'query', 'predicted_id_R/W', 'actual_id', 'predicted_answer', 'actual_answer',
-                     'predicted_answer_type', 'predicated_candidates'])
-            else:
-                csv_writer.writerow(['id', 'answer'])
-            for i in range(total):
-            # for i in range(20):
-                print(i, " / ", total)
-
-                qs = qs_all[i]
-                doc_id = doc_id_all[i]
-                doc = doc_all[doc_id]
-                if type == 0 or type == 1:
-                    answer = answer_all[i]
-                    answer_par_id = answer_par_id_all[i]
-                qs_processed = self.preprocess_questions(qs)
-                doc_processed = self.data.doc_processed[doc_id]
-
-                doc_entities = []
-                if doc_id in doc_entity_temp:
-                    doc_entities = doc_entity_temp[doc_id]
-                else:
-                    for par in doc:
-                        par_entities = []
-                        sent_text = sent_tokenize(par)
-                        for sent in sent_text:
-                            par_entities.append(self.ner_process(sent))
-                        doc_entities.append(par_entities)
-                    doc_entity_temp[doc_id] = doc_entities
-
-                wh = self.extract_wh_word(qs_processed)
-                possible_qs_type_rank, qs_type = self.identify_question_type(wh, qs_processed)
-                predict_answer = 'unknown'
-                answer_types = []
-                pred_par_id = -1
-                candidate_answers = ''
-                if possible_qs_type_rank:
-                    self.bm25.k1 = 1.2
-                    self.bm25.b = 0.75
-                    bm25_rank = self.bm25.sort_by_bm25_score(qs_processed, doc_processed)
-                    bm25_rank_par_ids = [x[0] for x in bm25_rank]
-                    for par_id in bm25_rank_par_ids:
-                        par_text = doc[par_id]
-                        sents_text = sent_tokenize(par_text)
-                        sent_tokens = self.bdp.preprocess_doc(sents_text)
-                        bm25_sent_tokens_rank = self.bm25.sort_by_bm25_score(qs_processed, sent_tokens)
-                        bm25_sent_tokens_rank_ids = [x[0] for x in bm25_sent_tokens_rank]
-                        for sent_id in bm25_sent_tokens_rank_ids:
-                            temp_answer, temp_answer_types, temp_candidate_answers = self.pred_answer_type(
-                                                                                                    doc_entities[
-                                                                                                        par_id][
-                                                                                                        sent_id],
-                                                                                                    qs_processed,
-                                                                                                    possible_qs_type_rank,
-                                                                                                    qs_type)
-                            if temp_answer != -1:
-                                predict_answer = temp_answer
-                                answer_types = temp_answer_types
-                                pred_par_id = par_id
-                                candidate_answers = '; '.join(temp_candidate_answers)
-                                break
-                        if temp_answer != -1:
-                            break
-
-                if type == 0 or type == 1:
-                    types = ' '.join(answer_types)
-                    if pred_par_id == int(answer_par_id):
-                        correct_id += 1
-                    if predict_answer == answer:
-                        csv_writer.writerow(
-                            ["##right##", qs, pred_par_id, answer_par_id, predict_answer, answer, types,
-                             candidate_answers])
-                        correct += 1
-                    else:
-                        csv_writer.writerow(
-                            ["##wrong##", qs, pred_par_id, answer_par_id, predict_answer, answer, types,
-                             candidate_answers])
-                    print(predict_answer, " ; ", answer)
-                    # print "correct :", correct
-                else:
-                    csv_writer.writerow([test_ids[i], predict_answer])
-
-            if type == 0 or type == 1:
-                csv_writer.writerow([str(correct), str(correct * 100.0 / total)])
-                csv_writer.writerow([str(correct_id), str(correct_id * 100.0 / total)])
-                csv_writer.writerow([str(total)])
-                print(correct * 100.0 / total)
-                print(correct_id * 100.0 / total)
-                print("best : 12.399095899257345")
 
 if __name__ == '__main__':
     rule_based_QA = RuleBasedQA()

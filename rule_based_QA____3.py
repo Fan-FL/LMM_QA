@@ -1,7 +1,15 @@
 from config import Config
+from data_processor import DataProcessor
+import sklearn
+from sklearn.neural_network import MLPClassifier
+from gensim.models import Word2Vec
+from nltk.corpus import brown, movie_reviews, treebank
 import numpy as np
+from numpy import ndarray as nd
+import sys
 import pickle
 from collections import defaultdict
+from sklearn import svm
 import unicodecsv as csv
 from file_loader import FileLoader
 from data import Data
@@ -81,8 +89,8 @@ class RuleBasedQA:
             if train_sens_embedding:
                 self.bdp.train_sens_embeddings()
 
-            self.predict_with_bm25_pars_sents(0)
-            # self.predict_with_bm25_sents(0)
+            # self.predict_with_bm25_pars_sents(0)
+            self.predict_with_bm25_sents(0)
 
         if dev:
             self.fileLoader.load_dev_data()
@@ -97,8 +105,8 @@ class RuleBasedQA:
                 self.test_BM25_par()
                 return
 
-            # self.predict_with_bm25_pars_sents(1)
-            self.predict_with_bm25_sents(1)
+            self.predict_with_bm25_pars_sents(1)
+            # self.predict_with_bm25_sents(1)
 
         if test:
             self.fileLoader.load_test_data()
@@ -191,8 +199,6 @@ class RuleBasedQA:
         elif wh == 'who' or wh == 'whom':
             return ['PERSON', 'ORGANIZATION', 'OTHER'], 'person'
         elif wh == 'where':
-            if 'headquarter' in raw_q_sent or 'capital' in raw_q_sent:
-                return ['CITY'], 'headquarter'
             return ['LOCATION', 'ORDINAL', 'OTHER'], 'location'
         elif wh == 'how':
             if 'old' in raw_q_sent or 'large' in raw_q_sent:
@@ -216,11 +222,7 @@ class RuleBasedQA:
                 return ['NATIONALITY'], 'language'
             if 'which year' in raw_q_sent:
                 return ['TIME', 'NUMBER'], 'year'
-            if 'which country' in raw_q_sent:
-                return ['COUNTRY'], 'country'
-            if 'which city' in raw_q_sent:
-                return ['CITY'], 'country'
-            if 'place' in raw_q_sent or 'location' in raw_q_sent or 'site' in raw_q_sent:
+            if 'place' in raw_q_sent or 'country' in raw_q_sent or 'city' in raw_q_sent or 'location' in raw_q_sent or 'site' in raw_q_sent:
                 return ['LOCATION', 'ORGANIZATION', 'OTHER', 'PERSON'], 'place'
             if 'person' in raw_q_sent:
                 return ['PERSON', 'ORGANIZATION', 'OTHER', 'LOCATION'], 'person'
@@ -653,11 +655,10 @@ class RuleBasedQA:
                             pred_answer = temp_answer
                             answer_types = temp_answer_types
                             pred_sent_id = sent_id
-                            candidate_answers = '; '.join(temp_candidate_answers)
                             break
                 if type == 0 or type == 1:
                     if pred_sent_id != -1:
-                        for par_id in range(len(doc)):
+                        for par_id in len(doc):
                             if doc_sents_text[pred_sent_id] in doc[par_id]:
                                 pred_par_id = par_id
                                 break

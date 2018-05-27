@@ -121,9 +121,9 @@ class BM25:
     def test_dev_BM25_accuracy(self, max_tolerant_num):
         n_accuary = defaultdict(int)
         # total = 10
-        total = len(self.data.dev_qs_processed)
+        total = int(len(self.data.dev_qs_processed)/10)
         # for i in range(total):
-        for i in range(len(self.data.dev_qs_processed)):
+        for i in range(total):
             print(i, ' / ', total)
             qs = self.data.dev_qs_processed[i]
             doc_id = self.data.dev_doc_ids[i]
