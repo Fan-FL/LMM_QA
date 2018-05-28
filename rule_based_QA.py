@@ -55,11 +55,11 @@ class RuleBasedQA:
 
         if load_processed_doc:
             if load_doc_from_pkl:
-                with open(self.config.doc_processed_path_bak, 'rb') as f:
+                with open(self.config.doc_processed_path, 'rb') as f:
                     self.data.doc_processed = pickle.load(f)
             else:
                 self.data.doc_processed = self.bdp.process_docs(self.data.doc_texts)
-                with open(self.config.doc_processed_path_bak, 'wb') as f:
+                with open(self.config.doc_processed_path, 'wb') as f:
                     pickle.dump(self.data.doc_processed, f)
 
 
@@ -236,16 +236,10 @@ class RuleBasedQA:
     def pred_answer_type(self, entities, qs_processed,
                                          possible_qs_type_rank, qs_type):
 
-
-        # not_in_qs_entities = self.remove_entity_in_qs(qs_processed, entities)
-
-        # qs_entities = [self.bdp.lemmatize(item[0]) for item in qs_entities]
-        # not_in_qs_entities = self.remove_entity_in_qs(qs_entities, entities)
         #doubt!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         not_in_qs_entities = self.remove_entity_in_qs(qs_processed, entities)
         ner_type_to_entities_dict = self.get_ner_type_to_entities_dict(not_in_qs_entities)
         grouped_entities_strings_lemmatized = [self.bdp.lemmatize_entity_name(tup[0]) for tup in entities]
-        # print("ner_type_to_entities_dict",ner_type_to_entities_dict)
         if not possible_qs_type_rank:
             return -1, [], []
 
@@ -253,10 +247,7 @@ class RuleBasedQA:
             if len(ner_type_to_entities_dict[type]) != 0:
                     assert ner_type_to_entities_dict[type]
                     one_type_entities = ner_type_to_entities_dict[type]
-                    # print(one_type_entities)
                     one_type_grouped_entities_strings = [x[0] for x in one_type_entities]
-                    # print(one_type_grouped_entities_strings)
-                    # if type == 'O' or type == 'OTHER':
                     if type == 'O':
                         one_type_grouped_entities_strings = [x[0] for x in pos_tag(one_type_grouped_entities_strings)
                                                             if 'NN' in x[1]]
@@ -264,7 +255,6 @@ class RuleBasedQA:
                     possible_entity_pos = []
                     qs_token_in_entity_pos = []
 
-                    # print("one_type_grouped_entities_strings", one_type_grouped_entities_strings)
 
                     for qs_token in qs_processed:
                         if qs_token in grouped_entities_strings_lemmatized:
@@ -284,18 +274,6 @@ class RuleBasedQA:
                                 break
                     assert len(possible_entity_pos) == len(distance)
 
-                    #             min_idx = np.argmin(distance)
-                    #
-                    #             best_entity = one_type_grouped_entities_strings[min_idx]
-                    #             if qs_type == 'year' and type == 'NUMBER':
-                    #                 years = [x for x in one_type_grouped_entities_strings if len(x) == 4]
-                    #                 if len(best_entity) != 4 and years:
-                    #                     best_entity = years[0]
-                    #                     return best_entity.lower(), possible_qs_type_rank
-                    #
-                    #             chunk_entities = entities[:possible_entity_pos[min_idx]]
-                    #             actual_idx = 0
-
                     if distance:
                         min_idx = np.argmin(distance)
                         best_entity = one_type_grouped_entities_strings[min_idx]
@@ -305,125 +283,9 @@ class RuleBasedQA:
                                 min_idx = np.argmin(distance)
                                 best_entity = one_type_grouped_entities_strings[min_idx]
                             return best_entity.lower(), possible_qs_type_rank, one_type_grouped_entities_strings
-                        #             chunk_entities = entities[:possible_entity_pos[min_idx]]
-                        #             actual_idx = 0
-                        #             for entity in chunk_entities:
-                        #                   actual_idx += len(entity[0].split())
                         return best_entity.lower(), possible_qs_type_rank, one_type_grouped_entities_strings
         return -1, [], []
 
-                        # if qs_type == 'year' and type == 'NUMBER':
-                        #     years = [x for x in one_type_grouped_entities_strings if len(x) == 4]
-                        #     if len(best_entity) != 4 and years:
-                        #         best_entity = years[0]
-                        #         return best_entity.lower(), possible_qs_type_rank
-
-                        # chunk_entities = entities[:possible_entity_pos[min_idx]]
-                        # actual_idx = 0
-                        # for entity in chunk_entities:
-                        #       actual_idx += len(entity[0].split())
-                        # actual_end_idx = actual_idx + len(best_entity.split())
-                        # if qs_type == 'length' and actual_end_idx < len(original_par):
-                        #     actual_end_idx += 1
-
-        # original_par = ner_par.copy()
-        # entities = self.get_combined_entities(ner_par)
-        # assert len(original_par) == len(ner_par)
-        # not_in_qs_entities = self.remove_entity_in_qs(qs_processed, entities)
-        # qs_processed = self.bdp.remove_stop_words(qs_processed)
-        # ner_type_to_entities_dict = self.get_ner_type_to_entities_dict(not_in_qs_entities)
-        # grouped_entities_strings_lemmatized = [self.bdp.lemmatize(tup[0]) for tup in entities]
-        # for type in possible_qs_type_rank:
-        #     if len(ner_type_to_entities_dict[type]) != 0:
-        #         assert ner_type_to_entities_dict[type]
-        #         one_type_entities = ner_type_to_entities_dict[type]
-        #         # print(one_type_entities)
-        #         one_type_grouped_entities_strings = [x[0] for x in one_type_entities]
-        #         one_type_grouped_entities_strings = self.bdp.remove_stop_words(one_type_grouped_entities_strings)
-        #         # print(one_type_grouped_entities_strings)
-        #         if type == 'O':
-        #             one_type_grouped_entities_strings = [x[0] for x in pos_tag(one_type_grouped_entities_strings)
-        #                                                 if 'NN' in x[1]]
-        #         distance = []
-        #         possible_entity_pos = []
-        #
-        #         qs_token_in_entity_pos = []
-        #         # print(qs_processed)
-        #         #
-        #         # for qs_token in qs_processed:
-        #         #     for i in range(len(grouped_entities_strings_lemmatized)):
-        #         #         entity_string = grouped_entities_strings_lemmatized[i]
-        #         #         if qs_token in entity_string:
-        #         #             qs_token_in_entity_pos.append(i)
-        #
-        #         for qs_token in qs_processed:
-        #             if qs_token in grouped_entities_strings_lemmatized:
-        #                 for i in range(len(grouped_entities_strings_lemmatized)):
-        #                     entity_string = grouped_entities_strings_lemmatized[i]
-        #                     if entity_string.lower() == qs_token.lower():
-        #                         qs_token_in_entity_pos.append(i)
-        #         for entity in one_type_grouped_entities_strings:
-        #             for j in range(len(entities)):
-        #                 word = entities[j][0]
-        #                 if word.lower() == entity.lower():
-        #                     sum_dist = 0
-        #                     for k in qs_token_in_entity_pos:
-        #                         sum_dist += (abs(j - k))
-        #                     distance.append(sum_dist)
-        #                     possible_entity_pos.append(j)
-        #                     break
-        #         assert len(possible_entity_pos) == len(distance)
-        #         if distance:
-        #             min_idx = np.argmin(distance)
-        #
-        #             best_entity = one_type_grouped_entities_strings[min_idx]
-        #             if qs_type == 'year' and type == 'NUMBER':
-        #                 years = [x for x in one_type_grouped_entities_strings if len(x) == 4]
-        #                 if len(best_entity) != 4 and years:
-        #                     best_entity = years[0]
-        #                     return best_entity.lower(), possible_qs_type_rank
-        #
-        #             chunk_entities = entities[:possible_entity_pos[min_idx]]
-        #             actual_idx = 0
-        #             for entity in chunk_entities:
-        #                   actual_idx += len(entity[0].split())
-        #             actual_end_idx = actual_idx + len(best_entity.split())
-        #             if qs_type == 'length' and actual_end_idx < len(original_par):
-        #                 actual_end_idx += 1
-        #             # if type=='NUMBER' and qtype=='length':
-        #             #     if actual_end_ind < len(raw_doc):
-        #             #         next_word = raw_doc[actual_end_ind]
-        #             #         synsets = wordnet.synsets(next_word)
-        #             #         if synsets:
-        #             #             best_syn = synsets[0]
-        #             #             hypers = best_syn.hypernyms()
-        #             #             if hypers:
-        #             #                 best_hyper = hypers[0]
-        #             #                 lemmas = best_hyper.lemma_names()
-        #             #                 if lemmas:
-        #             #                     lemma = lemmas[0]
-        #             #                     if 'unit' in lemma:
-        #             #                         actual_end_ind += 1
-        #             #
-        #
-        #             actual_best_entity = ' '.join(original_par[actual_idx:actual_end_idx])
-        #             actual_best_entity = actual_best_entity.replace('\"', '')
-        #             actual_best_entity = actual_best_entity.replace(',', '-COMMA-')
-        #             if qs_type == 'percentage' and 'per' not in actual_best_entity and actual_best_entity[-1].isdigit():
-        #                 if actual_end_idx < len(original_par):
-        #                     if original_par[actual_end_idx] == 'per':
-        #                         actual_best_entity += ' per cent'
-        #                     elif original_par[actual_end_idx] == 'percent':
-        #                         actual_best_entity += ' percent'
-        #                     else:
-        #                         actual_best_entity += ' %'
-        #                 else:
-        #                     actual_best_entity += ' %'
-        #             if qs_type == 'money' and actual_best_entity[0].isdigit():
-        #                 actual_best_entity = '$' + actual_best_entity
-        #
-        #             return actual_best_entity.lower(), possible_qs_type_rank
-        # return -1, []
 
     def get_combined_entities(self, ner_par):
         entities = []
@@ -522,9 +384,6 @@ class RuleBasedQA:
             for i in range(21):
                 for j in range(21):
                     print(str(k1), str(b))
-                    # fname = 'training_BM25_accuracy' + str(n) + str('.csv')
-                    # print(fname)
-                    # n += 1
                     self.bm25.k1 = k1
                     self.bm25.b = b
                     acc = self.bm25.test_dev_BM25_accuracy(2)
@@ -539,33 +398,6 @@ class RuleBasedQA:
             csv_writer.writerow(["best"])
             csv_writer.writerow([best_accuracy, best_k1, best_b])
         print(str(best_accuracy), str(best_k1), str(best_b))
-        return
-
-    def test_BM25_sent(self):
-        # n = 1
-        k1 = 0
-        b = 0
-        best_accuracy = 0
-        best_k1 = 0
-        best_b = 0
-        for i in range(1):
-            for j in range(1):
-                print(str(k1), str(b))
-                # fname = 'training_BM25_accuracy' + str(n) + str('.csv')
-                # print(fname)
-                # n += 1
-                self.bm25.k1 = best_k1
-                self.bm25.b = best_b
-                acc = self.bm25.test_dev_BM25_accuracy(2)
-                if acc > best_accuracy:
-                    best_accuracy = acc
-                    best_k1 = k1
-                    best_b = b
-                b += 0.1
-            k1 += 0.1
-            b = 0
-        # self.bm25.test_dev_BM25_accuracy(10, 'training_BM25_accuracy.csv')
-        print(str(best_accuracy), str(k1), str(b))
         return
 
     def predict_with_bm25_sents(self, type):
@@ -583,18 +415,18 @@ class RuleBasedQA:
             doc_id_all = self.data.train_doc_ids
             answer_all = self.data.train_answers
             answer_par_id_all = self.data.train_answer_par_ids
-            fname = 'train_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+            fname = self.config.predict_train_output_path
         elif type == 1:  # dev
             qs_all = self.data.dev_questions
             doc_id_all = self.data.dev_doc_ids
             answer_all = self.data.dev_answers
             answer_par_id_all = self.data.dev_answer_par_ids
-            fname = 'dev_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+            fname = self.config.predict_dev_output_path
         else:  # test
             qs_all = self.data.test_questions
             doc_id_all = self.data.test_doc_ids
             test_ids = self.data.test_ids
-            fname = 'test_results_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+            fname = self.config.predict_test_output_path
         total = int(len(qs_all))
         with open(fname, 'wb') as csv_file:
             csv_writer = csv.writer(csv_file)
@@ -639,8 +471,8 @@ class RuleBasedQA:
                 pred_par_id = -1
                 candidate_answers = ''
                 if possible_qs_type_rank:
-                    self.bm25.k1 = 1.2
-                    self.bm25.b = 0.75
+                    self.bm25.k1 = 0.1
+                    self.bm25.b = 0.9
                     sent_tokens = self.bdp.preprocess_doc(doc_sents_text)
                     bm25_sent_tokens_rank = self.bm25.sort_by_bm25_score(qs_processed, sent_tokens)
                     bm25_sent_tokens_rank_ids = [x[0] for x in bm25_sent_tokens_rank]
@@ -685,7 +517,7 @@ class RuleBasedQA:
                 csv_writer.writerow([str(total)])
                 print(correct * 100.0 / total)
                 print(correct_id * 100.0 / total)
-                print("best : 12.399095899257345")
+                print("best : 19.470455279302552")
 
     def predict_with_bm25_pars_sents(self, type):
         correct = 0
@@ -702,18 +534,18 @@ class RuleBasedQA:
             doc_id_all = self.data.train_doc_ids
             answer_all = self.data.train_answers
             answer_par_id_all = self.data.train_answer_par_ids
-            fname = 'train_result_pars_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+            fname = self.config.predict_train_output_path
         elif type == 1: # dev
             qs_all = self.data.dev_questions
             doc_id_all = self.data.dev_doc_ids
             answer_all = self.data.dev_answers
             answer_par_id_all = self.data.dev_answer_par_ids
-            fname = 'dev_result_pars_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+            fname = self.config.predict_dev_output_path
         else: #test
             qs_all = self.data.test_questions
             doc_id_all = self.data.test_doc_ids
             test_ids = self.data.test_ids
-            fname = 'test_results_pars_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+            fname = self.config.predict_test_output_path
         total = int(len(qs_all))
         with open(fname, 'wb') as csv_file:
             csv_writer = csv.writer(csv_file)
@@ -806,7 +638,7 @@ class RuleBasedQA:
                 csv_writer.writerow([str(total)])
                 print(correct * 100.0 / total)
                 print(correct_id * 100.0 / total)
-                print("best : 12.399095899257345")
+                print("best : 19.470455279302552")
 
 if __name__ == '__main__':
     rule_based_QA = RuleBasedQA()

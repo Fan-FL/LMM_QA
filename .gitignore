@@ -9,3 +9,4 @@ stanford/*
 *.bin
 *.xml
 *.log
+data_processor.pyc

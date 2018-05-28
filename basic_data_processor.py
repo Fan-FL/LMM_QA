@@ -92,23 +92,6 @@ class BasicDataProcessor:
     def process_docs(self, docs):
         return [self.preprocess_doc(doc) for doc in docs]
 
-    # def process_docs(self, docs):
-    #     doc_tokens_replaced = []
-    #     doc_original_tokens = []
-    #     doc_ner_tags = []
-    #     doc_par_tokens_replaced = []
-    #     i = 1
-    #     # for doc in docs[:2]:
-    #     for doc in docs:
-    #         print(i, "/" , len(docs))
-    #         i += 1
-    #         tokens_replaced, original_tokens, ner_tags, par_tokens_replaced = self.preprocess_doc(doc)
-    #         doc_tokens_replaced.append(tokens_replaced)
-    #         doc_original_tokens.append(original_tokens)
-    #         doc_ner_tags.append(ner_tags)
-    #         doc_par_tokens_replaced.append(par_tokens_replaced)
-    #     return doc_tokens_replaced, doc_original_tokens, doc_ner_tags, doc_par_tokens_replaced
-
     def preprocess_question(self, question):
         normal_tokens = word_tokenize(question.replace("\u200b", '').replace("\u2014", ''))
         remove_punc_tokens = [token for token in normal_tokens if not self.is_pure_puncs(token)]

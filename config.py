@@ -1,3 +1,6 @@
+import time
+
+
 class Config:
     def __init__(self):
         self.doc_file_name = 'Data/documents.json'
@@ -15,8 +18,10 @@ class Config:
         self.pos_jar_path = 'stanford/stanford-postagger/stanford-postagger.jar'
         self.parser_model_path = 'stanford/stanford-parser/stanford-parser-3.9.1-models.jar'
         self.parser_jar_path = 'stanford/stanford-parser/stanford-parser.jar'
+        self.predict_train_output_path = 'csv/train_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+        self.predict_dev_output_path = 'csv/dev_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+        self.predict_test_output_path = 'csv/test_results_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
 
-        self.clf_save_path = './clf_withFeatures.pkl'
         self.doc_processed_path = 'pkl/doc_processed.pkl'
         self.train_qs_processed_path = 'pkl/train_qs_processed.pkl'
         self.dev_qs_processed_path = 'pkl/dev_qs_processed.pkl'
@@ -26,19 +31,5 @@ class Config:
         self.training_ner_pkl = 'pkl/training_ner.pkl'
         self.dev_ner_pkl = 'pkl/dev_ner.pkl'
 
-        self.doc_processed_path_bak = 'pkl_bak/doc_processed.pkl'
-        self.train_qs_processed_path_bak = 'pkl_bak/train_qs_processed.pkl'
-        self.dev_qs_processed_path_bak = 'pkl_bak/dev_qs_processed.pkl'
-        self.test_qs_processed_path_bak = 'pkl_bak/test_qs_processed.pkl'
-        self.dev_rule_pkl_bak = 'pkl_bak/dev_rule_pkl.pkl'
 
         self.WH_words = ['how', 'what', 'where', 'when', 'who', 'which']
-        self.TAG = ['PERSON', 'LOCATION', 'NUMBER', 'OTHER', 'O']
-
-        self.MAX_PAIR_NUM = 24
-        self.q_type_clf_save_path = './models/clf_q.pkl'
-        self.enhanced_ner_model_path = './stanford/classifiers/english.muc.7class.distsim.crf.ser.gz'
-        self.enhanced_ner_TAG = ['ORGANIZATION', 'PERSON', 'LOCATION', 'DATE', 'TIME', 'MONEY', 'PERCENT',
-                                 'FACILITY', 'GPE', 'OTHER']
-        self.train_dev_processed_data_path = './data.pkl'
-        self.answer_model_path = './answer_model.pkl'
