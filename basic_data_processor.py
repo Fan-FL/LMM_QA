@@ -1,5 +1,4 @@
 from nltk import word_tokenize
-from nltk import sent_tokenize
 from string import punctuation
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
@@ -17,8 +16,6 @@ class BasicDataProcessor:
         self.config = config
         self.data = data
         self.lemmatizer = WordNetLemmatizer()
-        # self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path, binary=False)
-        # self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path, binary=True)
         self.tagger = StanfordNERTagger(model_filename=self.config.ner_model_path)
         self.postagger = StanfordPOSTagger(path_to_jar=self.config.pos_jar_path,
                                            model_filename=self.config.pos_model_path)
@@ -29,35 +26,6 @@ class BasicDataProcessor:
 
         self.punc = r"""!"#&'()*+;<=>?[]^`{}~"""
 
-    def train_sens_embeddings(self):
-        question_vectors = []
-        sens_vectors = []
-        label = []
-        # for i in range(len(self.data.train_qs_processed)):
-        for i in range(5):
-            train_qs = self.data.train_qs_processed[i]
-            train_answer = self.data.train_answers[i]
-            train_par_id = self.data.train_answer_par_ids[i]
-            train_doc_id = self.data.train_doc_ids[i]
-            train_par = self.data.doc_texts[train_doc_id][train_par_id]
-            train_sents = sent_tokenize(train_par)
-            sens_vector = []
-            q_vector = []
-            for token in train_qs:
-                if token in self.word2vec_model.vocab:
-                    q_vector.append(list(self.word2vec_model[token]))
-            for sent_id in range(len(train_sents)):
-                if train_answer in train_sents[sent_id]:
-                    sens_tokens = self.process_sent(train_sents[sent_id])
-                    for sens_token in sens_tokens:
-                        if sens_token in self.word2vec_model.vocab:
-                            sens_vector.append(list(self.word2vec_model[sens_token]))
-                    question_vectors.append(q_vector)
-                    sens_vectors.append(sens_vector)
-                    label.append(1)
-        print(question_vectors)
-        print(sens_vectors)
-        print(label)
 
     def preprocess_questions(self, questions):
         return [self.preprocess_question(q) for q in questions]

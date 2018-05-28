@@ -17,8 +17,8 @@ class RuleBasedQA:
     def __init__(self):
         # switch of train, dev, test model
         train = 0
-        dev = 1
-        test = 0
+        dev = 0
+        test = 1
 
         # switch of loading data from pkl or reprocessing
         load_processed_doc = 1
@@ -29,8 +29,6 @@ class RuleBasedQA:
 
         # switch of testing BM25 accuracy
         test_BM25 = 0
-
-        train_sens_embedding = 0
 
         self.data = Data()
         self.config = Config()
@@ -56,22 +54,9 @@ class RuleBasedQA:
         # load train data
         if train:
             self.fileLoader.load_training_data()
-            if load_train_qs_from_pkl:
-                with open(self.config.train_qs_processed_path, 'rb') as f:
-                    self.data.train_qs_processed = pickle.load(f)
-
-            else:
-                self.data.train_qs_processed = self.bdp.preprocess_questions(
-                    self.data.train_questions)
-                with open(self.config.train_qs_processed_path, 'wb') as f:
-                    pickle.dump(self.data.train_qs_processed, f)
-
             if test_BM25:
                 self.bm25.test_training_BM25_accuracy(10)
                 return
-
-            if train_sens_embedding:
-                self.bdp.train_sens_embeddings()
 
             # predict answer
             # self.predict_with_bm25_pars_sents(0)
@@ -80,13 +65,6 @@ class RuleBasedQA:
         # load dev data
         if dev:
             self.fileLoader.load_dev_data()
-            if load_dev_qs_from_pkl:
-                with open(self.config.dev_qs_processed_path, 'rb') as f:
-                    self.data.dev_qs_processed = pickle.load(f)
-            else:
-                self.data.dev_qs_processed = self.bdp.preprocess_questions(self.data.dev_questions)
-                with open(self.config.dev_qs_processed_path, 'wb') as f:
-                    pickle.dump(self.data.dev_qs_processed, f)
             if test_BM25:
                 self.bm25.test_BM25_par_on_dev()
                 return
@@ -98,29 +76,25 @@ class RuleBasedQA:
         # load test data
         if test:
             self.fileLoader.load_test_data()
-            if load_test_qs_from_pkl:
-                with open(self.config.test_qs_processed_path, 'rb') as f:
-                    self.data.test_qs_processed = pickle.load(f)
-            else:
-                self.data.test_qs_processed = self.bdp.preprocess_questions(
-                    self.data.test_questions)
-                with open(self.config.test_qs_processed_path, 'wb') as f:
-                    pickle.dump(self.data.test_qs_processed, f)
 
             # predict answer
             # self.predict_with_bm25_pars_sents(2)
             self.predict_with_bm25_sents(2)
 
-    # extract wh word from questions
-    # return wh word if found otherwise return -1
+    ''' extract wh word from questions
+        return wh word if found otherwise return -1
+    '''
+
     def extract_wh_word(self, words):
         for word in words:
             if word.lower() in self.config.WH_words or word.lower() == 'whom':
                 return word
         return -1
 
-    # identify question types based on rules
-    # return ranked ner tags and classified type
+    '''  identify question types based on rules
+    return ranked ner tags and classified type
+    '''
+
     def identify_question_type(self, wh, q_words):
         lower = self.bdp.lower_tokens(q_words)
         # open_words = self.dataProcessor.remove_stop_words(lower)
@@ -289,7 +263,9 @@ class RuleBasedQA:
                     return best_entity.lower(), one_type_grouped_entities_strings
         return -1, []
 
-    # combine neighbouring same kind of ner tag together except 'O'
+    '''  combine neighbouring same kind of ner tag together except 'O'
+    '''
+
     def get_combined_entities(self, ner_par):
         entities = []
         ner_group = []
@@ -309,7 +285,9 @@ class RuleBasedQA:
         entities += self.process_combined_entity(ner_group, prev_ner_type)
         return entities
 
-    # combine neighbouring same kind of ner tag together except 'O'
+    '''  combine neighbouring same kind of ner tag together except 'O'
+    '''
+
     def process_combined_entity(self, ner_group, ner_type):
         entities = []
         if ner_type == 'O':
@@ -339,7 +317,9 @@ class RuleBasedQA:
             ner_type_to_entities_dict[ner_type].append(entity)
         return ner_type_to_entities_dict
 
-    # preprocess questions and return tokens
+    '''  preprocess questions and return tokens
+    '''
+
     def preprocess_questions(self, raw_qs):
         # remove special characters
         raw_split = word_tokenize(raw_qs.replace("\u200b", '').replace("\u2014", ''))
@@ -350,8 +330,10 @@ class RuleBasedQA:
         lemmatized = self.bdp.lemmatize_tokens(remove_punc_in_words)
         return lemmatized
 
-    # input string of text
-    # return processed combined ner tags
+    ''' input string of text
+     return processed combined ner tags
+     '''
+
     def ner_process(self, text):
         # get ner tags
         ner_par = self.bdp.nlp.ner(text)
@@ -373,7 +355,9 @@ class RuleBasedQA:
                         item[0].lower() not in stopwords.words("english")]
         return original_ner
 
-    # predict answers by using bm25 finding answer sentence
+    '''  predict answers by using bm25 finding answer sentence
+    '''
+
     def predict_with_bm25_sents(self, type):
         # count correctly predicted questions
         correct = 0
@@ -519,8 +503,10 @@ class RuleBasedQA:
                 print(correct_id * 100.0 / total)
                 print("best : 19.470455279302552")
 
-    # predict answers by using bm25 firstly finding answer paragraph
-    # then within that paragraph finding answer sentence
+    '''  predict answers by using bm25 firstly finding answer paragraph
+     then within that paragraph finding answer sentence
+     '''
+
     def predict_with_bm25_pars_sents(self, type):
         # count correctly predicted questions
         correct = 0

@@ -8,7 +8,11 @@ class Config:
         self.dev_file_name = 'Data/devel.json'
         self.test_file_name = 'Data/testing.json'
 
-        self.embedding_size = 300
+        self.n_filters = 30
+        self.max_sent_len = 30
+        self.filter_size = 4
+        self.word_emb_dim = 300
+
         # self.word2vec_model_path = 'model/pruned.word2vec.txt'
         self.word2vec_model_path = 'model/GoogleNews-vectors-negative300.bin'
         # self.ner_model_path = 'stanford/stanford_ner/classifiers/english.muc.7class.distsim.crf.ser.gz'
@@ -25,6 +29,7 @@ class Config:
                                                                                   time.time())) + '.csv'
         self.predict_test_output_path = 'csv/test_results_sents' + time.strftime(
             '%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+        self.model_save_path = 'model/answer.model'
 
         self.doc_processed_path = 'pkl/doc_processed.pkl'
         self.train_qs_processed_path = 'pkl/train_qs_processed.pkl'
