@@ -23,9 +23,6 @@ class RuleBasedQA:
         # switch of loading data from pkl or reprocessing
         load_processed_doc = 1
         load_doc_from_pkl = 1
-        load_train_qs_from_pkl = 1
-        load_dev_qs_from_pkl = 1
-        load_test_qs_from_pkl = 1
 
         # switch of testing BM25 accuracy
         test_BM25 = 0

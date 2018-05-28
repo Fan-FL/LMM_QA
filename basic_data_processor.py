@@ -21,8 +21,8 @@ class BasicDataProcessor:
                                            model_filename=self.config.pos_model_path)
         self.dependency_parser = StanfordDependencyParser(path_to_jar=self.config.parser_jar_path,
                                                           path_to_models_jar=self.config.parser_model_path)
-        # self.nlp = StanfordCoreNLP("stanford/stanford-corenlp-full")
-        self.nlp = StanfordCoreNLP("http://localhost", port=9000)
+        self.nlp = StanfordCoreNLP("stanford/stanford-corenlp-full")
+        # self.nlp = StanfordCoreNLP("http://localhost", port=9000)
 
         self.punc = r"""!"#&'()*+;<=>?[]^`{}~"""
 
