@@ -3,18 +3,14 @@ from nltk import sent_tokenize
 from string import punctuation
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
-from gensim.models.keyedvectors import KeyedVectors
-from nltk.stem.wordnet import WordNetLemmatizer
 from nltk.tag.stanford import StanfordNERTagger
 from nltk.tag.stanford import StanfordPOSTagger
-from nltk.parse.corenlp import CoreNLPParser
-from nltk import pos_tag, pos_tag_sents
+from nltk import pos_tag
 from data import Data
 from config import Config
 from nltk.parse.stanford import StanfordDependencyParser
 from stanfordcorenlp import StanfordCoreNLP
-from nltk.tree import Tree
-import nltk
+
 
 class BasicDataProcessor:
     def __init__(self, config, data):
@@ -24,37 +20,14 @@ class BasicDataProcessor:
         # self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path, binary=False)
         # self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path, binary=True)
         self.tagger = StanfordNERTagger(model_filename=self.config.ner_model_path)
-        self.postagger = StanfordPOSTagger(path_to_jar=self.config.pos_jar_path, model_filename=self.config.pos_model_path)
+        self.postagger = StanfordPOSTagger(path_to_jar=self.config.pos_jar_path,
+                                           model_filename=self.config.pos_model_path)
         self.dependency_parser = StanfordDependencyParser(path_to_jar=self.config.parser_jar_path,
                                                           path_to_models_jar=self.config.parser_model_path)
         # self.nlp = StanfordCoreNLP("stanford/stanford-corenlp-full")
         self.nlp = StanfordCoreNLP("http://localhost", port=9000)
 
         self.punc = r"""!"#&'()*+;<=>?[]^`{}~"""
-
-        # # text = ('5-Aug-25')
-        # text = ('GOP Sen. Rand Paul was assaulted in his home in Bowling Green, Kentucky, on Friday, '
-        #         'according to Kentucky State Police. State troopers responded to a call to the senator\'s '
-        #         'residence at 3:21 p.m. Friday. Police arrested a man named Rene Albert Boucher, who they '
-        #         'allege "intentionally assaulted" Paul, causing him "minor injury". Boucher, 59, of Bowling '
-        #         'Green was charged with one count of fourth-degree assault. As of Saturday afternoon, he '
-        #         'was being held in the Warren County Regional Jail on a $5,000 bond.')
-        # aaa = self.nlp.parse(text)
-        #
-        # tree = nltk.tree.Tree.fromstring(aaa)
-        # self.traverse_tree(tree)
-
-    def traverse_tree(self, tree):
-        # print("tree:", tree)
-        for subtree in tree:
-            if type(subtree) == nltk.tree.Tree:
-                self.traverse_tree(subtree)
-            print(type(subtree))
-
-
-
-
-
 
     def train_sens_embeddings(self):
         question_vectors = []
@@ -115,9 +88,11 @@ class BasicDataProcessor:
             return True
         return False
 
+    # remove punctuations within a token
     def remove_punc_in_token(self, token):
         return ''.join([x for x in token if x not in punctuation]).strip()
 
+    # remove punctuations within a token if the punctuation is not in puc set
     def remove_punc_in_token_for_rule(self, token):
         return ''.join([x for x in token if x not in self.punc]).strip()
 
@@ -134,29 +109,13 @@ class BasicDataProcessor:
             lemma = self.lemmatizer.lemmatize(word, 'n')
         return lemma
 
-    # def preprocess_doc(self, doc):
-    #     normal_tokens = [[word_tokenize(sent.replace(u"\u200b",'').replace(u"\u2014",'')) for sent in sent_tokenize(par)] for par in doc]
-    #     remove_punc_tokens = [[[token for token in tokens if not self.is_pure_puncs(token)] for tokens in par] for par in normal_tokens]
-    #     remove_punc_in_tokens = [[[self.remove_punc_in_token(token) for token in tokens] for tokens in par] for par in remove_punc_tokens]
-    #     ner_tags = [self.ner_tagging(par) for par in remove_punc_in_tokens]
-    #     replaced_tokens = [
-    #         [['number' if tup[1] == 'NUMBER' else 'person' if tup[1] == 'PERSON' else 'location' if tup[1] == 'LOCATION'
-    #         else tup[0].lower() for tup in sent] for sent in par] for par in ner_tags]
-    #     original_tokens = [[[tup[0] for tup in sent] for sent in par] for par in ner_tags]
-    #     remove_stop_tokens_replaced = [[self.remove_stop_words(tokens) for tokens in par] for par in replaced_tokens]
-    #     lemmatized_tokens_replaced = [[self.lemmatize_tokens(tokens) for tokens in par] for par in remove_stop_tokens_replaced]
-    #     doc_par_tokens = []
-    #     for par in lemmatized_tokens_replaced:
-    #         par_tokens = []
-    #         for sens in par:
-    #             par_tokens += sens
-    #         doc_par_tokens.append(par_tokens)
-    #     return lemmatized_tokens_replaced, original_tokens, ner_tags, doc_par_tokens
-
     def preprocess_doc(self, doc):
-        normal_tokens = [word_tokenize(par.replace(u"\u200b",'').replace(u"\u2014",'')) for par in doc]
-        remove_punc_tokens = [[token for token in tokens if not self.is_pure_puncs(token)] for tokens in normal_tokens]
-        remove_punc_in_tokens = [[self.remove_punc_in_token(token) for token in tokens] for tokens in remove_punc_tokens]
+        normal_tokens = [word_tokenize(par.replace(u"\u200b", '').replace(u"\u2014", '')) for par in
+                         doc]
+        remove_punc_tokens = [[token for token in tokens if not self.is_pure_puncs(token)] for
+                              tokens in normal_tokens]
+        remove_punc_in_tokens = [[self.remove_punc_in_token(token) for token in tokens] for tokens
+                                 in remove_punc_tokens]
         lower_tokens = [self.lower_tokens(tokens) for tokens in remove_punc_in_tokens]
         remove_stop_tokens = [self.remove_stop_words(tokens) for tokens in lower_tokens]
         lemmatized_tokens = [self.lemmatize_tokens(tokens) for tokens in remove_stop_tokens]
@@ -170,7 +129,9 @@ class BasicDataProcessor:
         remove_punc_tokens = [token for token in normal_tokens if not self.is_pure_puncs(token)]
         remove_punc_in_tokens = [self.remove_punc_in_token(token) for token in remove_punc_tokens]
         ner_tags = self.sens_ner_tagging(remove_punc_in_tokens)
-        replaced_tokens = ['number' if tup[1] == 'NUMBER' else 'person' if tup[1] == 'PERSON' else 'location' if tup[1] == 'LOCATION' else tup[0].lower() for tup in ner_tags]
+        replaced_tokens = [
+            'number' if tup[1] == 'NUMBER' else 'person' if tup[1] == 'PERSON' else 'location' if
+            tup[1] == 'LOCATION' else tup[0].lower() for tup in ner_tags]
         lower_tokens = self.lower_tokens(replaced_tokens)
         remove_stop_tokens = self.remove_stop_words(lower_tokens)
         lemmatized_tokens = self.lemmatize_tokens(remove_stop_tokens)
@@ -178,32 +139,6 @@ class BasicDataProcessor:
 
     def lower_tokens(self, words):
         return [word.lower() for word in words]
-
-    def ner_tagging(self, sents):
-        ner_sents = self.tagger.tag_sents(sents)
-        processed_ners = []
-        for i in range(len(ner_sents)):
-            sent = sents[i]
-            pos_sent = pos_tag(sent)
-            ner_sent = ner_sents[i]
-            processed_ner_sent = []
-            for j in range(len(ner_sent)):
-                span, tag = ner_sent[j]
-                _, pos = pos_sent[j]
-                if span.isdigit() or pos == 'CD':
-                    processed_ner_sent.append((span, 'NUMBER'))
-                # elif tag == 'PERSON':
-                #     processed_ner_sent.append((span, 'PERSON'))
-                # elif tag == 'LOCATION':
-                #     processed_ner_sent.append((span, 'LOCATION'))
-                elif tag == 'ORGANIZATION':
-                    processed_ner_sent.append((span, 'OTHER'))
-                elif j != 0 and tag == 'O' and span[0].isupper():
-                    processed_ner_sent.append((span, 'OTHER'))
-                else:
-                    processed_ner_sent.append((span, tag))
-            processed_ners.append(processed_ner_sent)
-        return processed_ners
 
     def sens_ner_tagging(self, sent):
         ner_sents = self.tagger.tag_sents([sent])
@@ -226,9 +161,6 @@ class BasicDataProcessor:
             else:
                 processed_ner_sent.append((span, tag))
         return processed_ner_sent
-
-    def get_entity_names(self, entity):
-        return [item[0].lower() for item in entity]
 
     def lemmatize_entity_name(self, entity_name):
         tokens = entity_name.split()

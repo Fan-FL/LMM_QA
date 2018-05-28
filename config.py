@@ -18,9 +18,13 @@ class Config:
         self.pos_jar_path = 'stanford/stanford-postagger/stanford-postagger.jar'
         self.parser_model_path = 'stanford/stanford-parser/stanford-parser-3.9.1-models.jar'
         self.parser_jar_path = 'stanford/stanford-parser/stanford-parser.jar'
-        self.predict_train_output_path = 'csv/train_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        self.predict_dev_output_path = 'csv/dev_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        self.predict_test_output_path = 'csv/test_results_sents' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+        self.predict_train_output_path = 'csv/train_result_sents' + time.strftime(
+            '%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
+        self.predict_dev_output_path = 'csv/dev_result_sents' + time.strftime('%Y-%m-%d_%H-%M-%S',
+                                                                              time.localtime(
+                                                                                  time.time())) + '.csv'
+        self.predict_test_output_path = 'csv/test_results_sents' + time.strftime(
+            '%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
 
         self.doc_processed_path = 'pkl/doc_processed.pkl'
         self.train_qs_processed_path = 'pkl/train_qs_processed.pkl'
@@ -30,6 +34,6 @@ class Config:
         self.sentence_embedding_pkl = 'pkl/sentence_embedding.pkl'
         self.training_ner_pkl = 'pkl/training_ner.pkl'
         self.dev_ner_pkl = 'pkl/dev_ner.pkl'
-
+        self.train_answer_ner = 'pkl/dev_ner.pkl'
 
         self.WH_words = ['how', 'what', 'where', 'when', 'who', 'which']

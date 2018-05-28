@@ -2,6 +2,8 @@ import codecs
 import json
 
 
+# File loader class for loading doc, train, dev and test data from json files and save
+# in data class
 class FileLoader:
     def __init__(self, config, data):
         self.config = config

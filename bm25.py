@@ -1,7 +1,7 @@
 from collections import defaultdict
 import unicodecsv as csv
-import math
 from math import log
+
 
 class BM25:
     def __init__(self, config, data):
@@ -55,9 +55,11 @@ class BM25:
                 else:
                     fdt = 0
                 fqt = tf_query_dict[term]
-                acc_bm25_score += self.cal_bm25(pars_count, ft, fdt, fqt, par_Length, parLength_avg, self.k1, self.b)
+                acc_bm25_score += self.cal_bm25(pars_count, ft, fdt, fqt, par_Length, parLength_avg,
+                                                self.k1, self.b)
             acc_bm25_dict[i] = acc_bm25_score
-        sorted_acc_bm25_dict = sorted(list(acc_bm25_dict.items()), key=lambda item: item[1], reverse=True)
+        sorted_acc_bm25_dict = sorted(list(acc_bm25_dict.items()), key=lambda item: item[1],
+                                      reverse=True)
         return sorted_acc_bm25_dict
 
     # calculate bm25 scores of a word in a query with a document
@@ -83,11 +85,11 @@ class BM25:
             totalLen += len(par)
         return totalLen / N
 
+    # test bm25 accuracy of finding answer paragraph on training data
+    # return accuracy of ranking the answer paragraph in the top max_tolerant_num order
     def test_training_BM25_accuracy(self, max_tolerant_num, fname):
         n_accuary = defaultdict(int)
-        # total = 10
         total = len(self.data.train_qs_processed)
-        # for i in range(total):
         for i in range(len(self.data.train_qs_processed)):
             print(i, ' / ', total)
             qs = self.data.train_qs_processed[i]
@@ -99,8 +101,6 @@ class BM25:
 
             if ranked_pars:
                 count_N = -1
-                # print [k for k, v in ranked_pars]
-                # print answer_par_id
                 for k, val in ranked_pars:
                     count_N += 1
                     if count_N < max_tolerant_num:
@@ -109,7 +109,6 @@ class BM25:
                                 n_accuary[m] += 1
                     else:
                         break
-        # print n_accuary
         with open(fname, 'wb') as csv_file:
             csv_writer = csv.writer(csv_file)
             csv_writer.writerow(['total', str(total)])
@@ -117,12 +116,11 @@ class BM25:
             for k, v in list(n_accuary.items()):
                 csv_writer.writerow([str(k), str(v), str(1.0 * v / total)])
 
-
+    # test bm25 accuracy of finding answer paragraph on dev data
+    # return accuracy of ranking the answer paragraph in the top max_tolerant_num order
     def test_dev_BM25_accuracy(self, max_tolerant_num):
         n_accuary = defaultdict(int)
-        # total = 10
-        total = int(len(self.data.dev_qs_processed)/10)
-        # for i in range(total):
+        total = int(len(self.data.dev_qs_processed) / 10)
         for i in range(total):
             print(i, ' / ', total)
             qs = self.data.dev_qs_processed[i]
@@ -130,12 +128,9 @@ class BM25:
             answer_par_id = self.data.dev_answer_par_ids[i]
             doc = self.data.doc_processed[doc_id]
 
-            # print(doc)
             ranked_pars = self.sort_by_bm25_score(qs, doc)
             if ranked_pars:
                 count_N = -1
-                # print [k for k, v in ranked_pars]
-                # print answer_par_id
                 for k, val in ranked_pars:
                     count_N += 1
                     if count_N < max_tolerant_num:
@@ -145,14 +140,36 @@ class BM25:
                     else:
                         break
         return 1.0 * n_accuary[1] / total
-        # print n_accuary
-        # with open('dev_BM25_accuracy3.csv', 'wb') as csv_file:
-        #     csv_writer = csv.writer(csv_file)
-        #     csv_writer.writerow(['total', str(total)])
-        #     csv_writer.writerow(['N', "correct", 'accuracy'])
-        #     for k, v in list(n_accuary.items()):
-        #         csv_writer.writerow([str(k), str(v), str(1.0 * v / total)])
-        #         print(str(k), str(v), str(1.0 * v / total))
-        #     csv_writer.writerow([str(self.k1), str(self.b)])
-        #     print([str(self.k1), str(self.b)])
 
+    # find best BM25 parameters on dev data
+    # try k1 between 0.1 and 2.1, b between 0.1 and 2.1
+    def test_BM25_par_on_dev(self):
+        # n = 1
+        k1 = 0.1
+        b = 0.1
+        best_accuracy = 0
+        best_k1 = 0.1
+        best_b = 0.1
+        fname = 'bm25_dev_' + time.strftime('%Y-%m-%d_%H-%M-%S',
+                                            time.localtime(time.time())) + '.csv'
+        with open(fname, 'wb') as csv_file:
+            csv_writer = csv.writer(csv_file)
+            csv_writer.writerow(["k1", 'b'])
+            for i in range(21):
+                for j in range(21):
+                    print(str(k1), str(b))
+                    self.k1 = k1
+                    self.b = b
+                    acc = self.test_dev_BM25_accuracy(2)
+                    if acc > best_accuracy:
+                        best_accuracy = acc
+                        best_k1 = k1
+                        best_b = b
+                    csv_writer.writerow([k1, b, acc])
+                    b += 0.1
+                k1 += 0.1
+                b = 0.1
+            csv_writer.writerow(["best"])
+            csv_writer.writerow([best_accuracy, best_k1, best_b])
+        print(str(best_accuracy), str(best_k1), str(best_b))
+        return

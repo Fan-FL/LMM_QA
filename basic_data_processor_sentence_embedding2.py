@@ -11,12 +11,14 @@ import pickle
 import numpy as np
 from scnn import Trainer
 
+
 class BasicDataProcessor:
     def __init__(self, config, data):
         self.config = config
         self.data = data
         self.lemmatizer = WordNetLemmatizer()
-        self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path, binary=True)
+        self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path,
+                                                                binary=True)
         self.trn = Trainer()
         # self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.word2vec_model_path)
 
@@ -26,8 +28,8 @@ class BasicDataProcessor:
         label = []
         total = int(len(self.data.train_qs_processed))
         for i in range(total):
-        # for i in range(20):
-            if i%1000 == 0:
+            # for i in range(20):
+            if i % 1000 == 0:
                 print(i, '/', total)
             train_qs = self.data.train_qs_processed[i]
             train_answer = self.data.train_answers[i]
@@ -59,7 +61,8 @@ class BasicDataProcessor:
                             if wrong_id == sent_id:
                                 continue
                             else:
-                                wrong_sent_vector = self.generate_sent_embedding(train_sents[wrong_id])
+                                wrong_sent_vector = self.generate_sent_embedding(
+                                    train_sents[wrong_id])
                                 if wrong_sent_vector:
                                     question_vectors.append(q_vector)
                                     sent_vectors.append(wrong_sent_vector)
@@ -160,9 +163,12 @@ class BasicDataProcessor:
     #     return lemmatized_tokens_replaced, original_tokens, ner_tags, doc_par_tokens
 
     def preprocess_doc(self, doc):
-        normal_tokens = [word_tokenize(par.replace(u"\u200b",'').replace(u"\u2014",'')) for par in doc]
-        remove_punc_tokens = [[token for token in tokens if not self.is_pure_puncs(token)] for tokens in normal_tokens]
-        remove_punc_in_tokens = [[self.remove_punc_in_token(token) for token in tokens] for tokens in remove_punc_tokens]
+        normal_tokens = [word_tokenize(par.replace(u"\u200b", '').replace(u"\u2014", '')) for par in
+                         doc]
+        remove_punc_tokens = [[token for token in tokens if not self.is_pure_puncs(token)] for
+                              tokens in normal_tokens]
+        remove_punc_in_tokens = [[self.remove_punc_in_token(token) for token in tokens] for tokens
+                                 in remove_punc_tokens]
         lower_tokens = [self.lower_tokens(tokens) for tokens in remove_punc_in_tokens]
         lemmatized_tokens = [self.lemmatize_tokens(tokens) for tokens in lower_tokens]
         return lemmatized_tokens

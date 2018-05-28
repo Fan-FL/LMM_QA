@@ -4,6 +4,7 @@ from file_loader import FileLoader
 from data import Data
 from basic_data_processor_sentence_embedding import BasicDataProcessor
 
+
 class TrainBasedQA:
     def __init__(self):
         train = 0
@@ -26,14 +27,11 @@ class TrainBasedQA:
         if load_processed_doc:
             if load_doc_from_pkl:
                 with open(self.config.doc_processed_path, 'rb') as f:
-                    self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens, self.data.doc_ner_sents, self.data.doc_processed = pickle.load(
-                        f)
+                    self.data.doc_processed = pickle.load(f)
             else:
-                self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens, self.data.doc_ner_sents, self.data.doc_processed = self.bdp.process_docs(
-                    self.data.doc_texts)
+                self.data.doc_processed = self.bdp.process_docs(self.data.doc_texts)
                 with open(self.config.doc_processed_path, 'wb') as f:
-                    pickle.dump([self.data.doc_processed_sents_tokens, self.data.doc_original_sents_tokens,
-                                 self.data.doc_ner_sents, self.data.doc_processed], f)
+                    pickle.dump(self.data.doc_processed, f)
 
         if train:
             self.fileLoader.load_training_data()
@@ -42,7 +40,8 @@ class TrainBasedQA:
                     self.data.train_qs_processed = pickle.load(f)
 
             else:
-                self.data.train_qs_processed = self.bdp.preprocess_questions(self.data.train_questions)
+                self.data.train_qs_processed = self.bdp.preprocess_questions(
+                    self.data.train_questions)
                 with open(self.config.train_qs_processed_path, 'wb') as f:
                     pickle.dump(self.data.train_qs_processed, f)
 
@@ -68,11 +67,11 @@ class TrainBasedQA:
                 with open(self.config.test_qs_processed_path, 'rb') as f:
                     self.data.test_qs_processed = pickle.load(f)
             else:
-                self.data.test_qs_processed = self.bdp.preprocess_questions(self.data.test_questions)
+                self.data.test_qs_processed = self.bdp.preprocess_questions(
+                    self.data.test_questions)
                 with open(self.config.test_qs_processed_path, 'wb') as f:
                     pickle.dump(self.data.test_qs_processed, f)
 
 
 if __name__ == '__main__':
     train_based_QA = TrainBasedQA()
-

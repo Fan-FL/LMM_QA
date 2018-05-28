@@ -1,10 +1,9 @@
+# class for saving all raw data loaded from json and preprocessed data
+
 class Data:
     def __init__(self):
         self.doc_ids = list()
         self.doc_texts = list()
-        self.doc_processed_sents_tokens = list()
-        self.doc_original_sents_tokens = list()
-        self.doc_ner_sents = list()
         self.doc_processed = list()
 
         self.train_doc_ids = list()

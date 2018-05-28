@@ -11,20 +11,25 @@ from nltk import word_tokenize
 from nltk import pos_tag
 from nltk.corpus import stopwords
 from nltk import sent_tokenize
-import time
+
 
 class RuleBasedQA:
     def __init__(self):
-
+        # switch of train, dev, test model
         train = 0
         dev = 1
         test = 0
+
+        # switch of loading data from pkl or reprocessing
         load_processed_doc = 1
         load_doc_from_pkl = 1
         load_train_qs_from_pkl = 1
         load_dev_qs_from_pkl = 1
         load_test_qs_from_pkl = 1
+
+        # switch of testing BM25 accuracy
         test_BM25 = 0
+
         train_sens_embedding = 0
 
         self.data = Data()
@@ -33,26 +38,12 @@ class RuleBasedQA:
         self.bdp = BasicDataProcessor(self.config, self.data)
         self.bm25 = BM25(self.config, self.data)
 
-        self.location = ['LOCATION']
-        self.city = ['CITY']
-        self.state_or_province = ['STATE_OR_PROVINCE']
-        self.country = ['COUNTRY']
-        self.nationality = ['NATIONALITY']
-        self.religion = ['RELIGION']
-        self.person = ['PERSON']
-        self.organization = ['ORGANIZATION']
-        self.number = ["NUMBER"]
-        self.ordinal = ['ORDINAL']
-        self.money = ["MONEY"]
-        self.percent = ["PERCENT"]
-        self.date = ['DATE']
-        self.time = ['TIME']
-        self.duration = ['DURATION']
-        self.cause_of_death = ['CAUSE_OF_DEATH']
+        # not used ner tags, will merge them together with 'O' tag
         self.other = ['SET', "MISC", 'EMAIL', 'URL', 'TITLE', 'IDEOLOGY', 'CRIMINAL_CHARGE']
 
         self.fileLoader.load_doc()
 
+        # load doc data
         if load_processed_doc:
             if load_doc_from_pkl:
                 with open(self.config.doc_processed_path, 'rb') as f:
@@ -62,7 +53,7 @@ class RuleBasedQA:
                 with open(self.config.doc_processed_path, 'wb') as f:
                     pickle.dump(self.data.doc_processed, f)
 
-
+        # load train data
         if train:
             self.fileLoader.load_training_data()
             if load_train_qs_from_pkl:
@@ -70,7 +61,8 @@ class RuleBasedQA:
                     self.data.train_qs_processed = pickle.load(f)
 
             else:
-                self.data.train_qs_processed = self.bdp.preprocess_questions(self.data.train_questions)
+                self.data.train_qs_processed = self.bdp.preprocess_questions(
+                    self.data.train_questions)
                 with open(self.config.train_qs_processed_path, 'wb') as f:
                     pickle.dump(self.data.train_qs_processed, f)
 
@@ -81,9 +73,11 @@ class RuleBasedQA:
             if train_sens_embedding:
                 self.bdp.train_sens_embeddings()
 
-            self.predict_with_bm25_pars_sents(0)
-            # self.predict_with_bm25_sents(0)
+            # predict answer
+            # self.predict_with_bm25_pars_sents(0)
+            self.predict_with_bm25_sents(0)
 
+        # load dev data
         if dev:
             self.fileLoader.load_dev_data()
             if load_dev_qs_from_pkl:
@@ -94,47 +88,39 @@ class RuleBasedQA:
                 with open(self.config.dev_qs_processed_path, 'wb') as f:
                     pickle.dump(self.data.dev_qs_processed, f)
             if test_BM25:
-                self.test_BM25_par()
+                self.bm25.test_BM25_par_on_dev()
                 return
 
-            # self.predict_with_bm25_pars_sents(1)
-            self.predict_with_bm25_sents(1)
+            # predict answer
+            self.predict_with_bm25_pars_sents(1)
+            # self.predict_with_bm25_sents(1)
 
+        # load test data
         if test:
             self.fileLoader.load_test_data()
             if load_test_qs_from_pkl:
                 with open(self.config.test_qs_processed_path, 'rb') as f:
                     self.data.test_qs_processed = pickle.load(f)
             else:
-                self.data.test_qs_processed = self.bdp.preprocess_questions(self.data.test_questions)
+                self.data.test_qs_processed = self.bdp.preprocess_questions(
+                    self.data.test_questions)
                 with open(self.config.test_qs_processed_path, 'wb') as f:
                     pickle.dump(self.data.test_qs_processed, f)
 
-            self.predict_with_bm25_pars_sents(2)
-            # self.predict_with_bm25_sents(2)
+            # predict answer
+            # self.predict_with_bm25_pars_sents(2)
+            self.predict_with_bm25_sents(2)
 
-    def preprocess_doc_for_rule(self, doc):
-        normal_tokens = [word_tokenize(par.replace("\u200b",'').replace("\u2014",'')) for par in doc]
-        remove_punc_tokens = [[token for token in tokens if not self.bdp.is_pure_puncs(token)] for tokens in normal_tokens]
-        remove_punc_in_tokens = [[self.bdp.remove_punc_in_token(token) for token in tokens] for tokens in remove_punc_tokens]
-        ners = self.bdp.ner_tagging(remove_punc_in_tokens)
-        return ners, remove_punc_tokens
-
-    def mark_wh_word(self, words):
-        wh_word_marks = [0] * (len(self.config.WH_words) + 1)
-        for word in words:
-            if word in self.config.WH_words:
-                wh_word_marks[self.config.WH_words.index(word)] = 1
-                return wh_word_marks
-        wh_word_marks[-1] = 1
-        return wh_word_marks
-
+    # extract wh word from questions
+    # return wh word if found otherwise return -1
     def extract_wh_word(self, words):
         for word in words:
             if word.lower() in self.config.WH_words or word.lower() == 'whom':
                 return word
         return -1
 
+    # identify question types based on rules
+    # return ranked ner tags and classified type
     def identify_question_type(self, wh, q_words):
         lower = self.bdp.lower_tokens(q_words)
         # open_words = self.dataProcessor.remove_stop_words(lower)
@@ -234,59 +220,76 @@ class RuleBasedQA:
             return ['O', 'OTHER', 'LOCATION', 'PERSON', 'NUMBER'], 'else'
 
     def pred_answer_type(self, entities, qs_processed,
-                                         possible_qs_type_rank, qs_type):
+                         possible_qs_type_rank, qs_type):
 
-        #doubt!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # doubt!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # remove doc entities appeared in the question
         not_in_qs_entities = self.remove_entity_in_qs(qs_processed, entities)
+        # get entity dict by ner tags
         ner_type_to_entities_dict = self.get_ner_type_to_entities_dict(not_in_qs_entities)
-        grouped_entities_strings_lemmatized = [self.bdp.lemmatize_entity_name(tup[0]) for tup in entities]
+        # get lemmatized eneities strings
+        grouped_entities_strings_lemmatized = [self.bdp.lemmatize_entity_name(tup[0]) for tup in
+                                               entities]
         if not possible_qs_type_rank:
-            return -1, [], []
+            return -1, []
 
+        # iterate possible answer ner tag in likelihood order
         for type in possible_qs_type_rank:
             if len(ner_type_to_entities_dict[type]) != 0:
-                    assert ner_type_to_entities_dict[type]
-                    one_type_entities = ner_type_to_entities_dict[type]
-                    one_type_grouped_entities_strings = [x[0] for x in one_type_entities]
-                    if type == 'O':
-                        one_type_grouped_entities_strings = [x[0] for x in pos_tag(one_type_grouped_entities_strings)
-                                                            if 'NN' in x[1]]
-                    distance = []
-                    possible_entity_pos = []
-                    qs_token_in_entity_pos = []
+                assert ner_type_to_entities_dict[type]
+                # get all this kind tag entities
+                one_type_entities = ner_type_to_entities_dict[type]
+                one_type_grouped_entities_strings = [x[0] for x in one_type_entities]
+                # if the type is 'O', only get 'NN' pos tag entities
+                if type == 'O':
+                    one_type_grouped_entities_strings = [x[0] for x in
+                                                         pos_tag(one_type_grouped_entities_strings)
+                                                         if 'NN' in x[1]]
+                # distance between candidate answer entity to all question tokens
+                # in the text
+                distance = []
+                # candidate answer entity position
+                possible_entity_pos = []
+                # position of question token in text
+                qs_token_in_entity_pos = []
 
+                # position of question token in text
+                for qs_token in qs_processed:
+                    if qs_token in grouped_entities_strings_lemmatized:
+                        for i in range(len(grouped_entities_strings_lemmatized)):
+                            entity_string = grouped_entities_strings_lemmatized[i]
+                            if entity_string.lower() in qs_token:
+                                qs_token_in_entity_pos.append(i)
+                # calculate distance between candidate answer entity to all question tokens
+                # in the text
+                for entity in one_type_grouped_entities_strings:
+                    for j in range(len(entities)):
+                        word = entities[j][0]
+                        if word.lower() == entity.lower():
+                            sum_dist = 0
+                            for k in qs_token_in_entity_pos:
+                                sum_dist += (abs(j - k))
+                            distance.append(sum_dist)
+                            possible_entity_pos.append(j)
+                            break
+                assert len(possible_entity_pos) == len(distance)
 
-                    for qs_token in qs_processed:
-                        if qs_token in grouped_entities_strings_lemmatized:
-                            for i in range(len(grouped_entities_strings_lemmatized)):
-                                entity_string = grouped_entities_strings_lemmatized[i]
-                                if entity_string.lower() in qs_token:
-                                    qs_token_in_entity_pos.append(i)
-                    for entity in one_type_grouped_entities_strings:
-                        for j in range(len(entities)):
-                            word = entities[j][0]
-                            if word.lower() == entity.lower():
-                                sum_dist = 0
-                                for k in qs_token_in_entity_pos:
-                                    sum_dist += (abs(j - k))
-                                distance.append(sum_dist)
-                                possible_entity_pos.append(j)
-                                break
-                    assert len(possible_entity_pos) == len(distance)
+                if distance:
+                    # choose the entities with the minimum distance to the question tokens
+                    min_idx = np.argmin(distance)
+                    best_entity = one_type_grouped_entities_strings[min_idx]
+                    # if the question type is year, choose a 4-length-number entity with
+                    # minimum distance
+                    if qs_type == 'year':
+                        while len(best_entity) != 4 and len(distance) > 1:
+                            distance.remove(distance[min_idx])
+                            min_idx = np.argmin(distance)
+                            best_entity = one_type_grouped_entities_strings[min_idx]
+                        return best_entity.lower(), one_type_grouped_entities_strings
+                    return best_entity.lower(), one_type_grouped_entities_strings
+        return -1, []
 
-                    if distance:
-                        min_idx = np.argmin(distance)
-                        best_entity = one_type_grouped_entities_strings[min_idx]
-                        if qs_type == 'year':
-                            while len(best_entity) != 4 and len(distance) > 1:
-                                distance.remove(distance[min_idx])
-                                min_idx = np.argmin(distance)
-                                best_entity = one_type_grouped_entities_strings[min_idx]
-                            return best_entity.lower(), possible_qs_type_rank, one_type_grouped_entities_strings
-                        return best_entity.lower(), possible_qs_type_rank, one_type_grouped_entities_strings
-        return -1, [], []
-
-
+    # combine neighbouring same kind of ner tag together except 'O'
     def get_combined_entities(self, ner_par):
         entities = []
         ner_group = []
@@ -306,6 +309,7 @@ class RuleBasedQA:
         entities += self.process_combined_entity(ner_group, prev_ner_type)
         return entities
 
+    # combine neighbouring same kind of ner tag together except 'O'
     def process_combined_entity(self, ner_group, ner_type):
         entities = []
         if ner_type == 'O':
@@ -335,75 +339,49 @@ class RuleBasedQA:
             ner_type_to_entities_dict[ner_type].append(entity)
         return ner_type_to_entities_dict
 
+    # preprocess questions and return tokens
     def preprocess_questions(self, raw_qs):
+        # remove special characters
         raw_split = word_tokenize(raw_qs.replace("\u200b", '').replace("\u2014", ''))
+        # remove pure punctuation tokens
         remove_pure_punc = [token for token in raw_split if not self.bdp.is_pure_puncs(token)]
+        # remove punctuations within a token
         remove_punc_in_words = [self.bdp.remove_punc_in_token(token) for token in remove_pure_punc]
         lemmatized = self.bdp.lemmatize_tokens(remove_punc_in_words)
         return lemmatized
 
+    # input string of text
+    # return processed combined ner tags
     def ner_process(self, text):
+        # get ner tags
         ner_par = self.bdp.nlp.ner(text)
         original_ner = []
         for tup in ner_par:
             tup = list(tup)
+            # change tags in 'OTHER' set to 'O'
             if tup[1] in self.other:
                 tup[1] = 'O'
+            # remove certain kind of punctuations ina token
             tup[0] = self.bdp.remove_punc_in_token_for_rule(tup[0])
             original_ner.append(tup)
+        # combine neighbouring same kind of ner tag together except 'O'
         original_ner = self.get_combined_entities(original_ner)
+        # remove pure punctuation tokens
         original_ner = [item for item in original_ner if not self.bdp.is_pure_puncs(item[0])]
-        original_ner = [item for item in original_ner if item[0].lower() not in stopwords.words("english")]
-        # original_ner = [item for item in original_ner if not self.entity_lenth_filter(item)]
+        # remove stop word tokens
+        original_ner = [item for item in original_ner if
+                        item[0].lower() not in stopwords.words("english")]
         return original_ner
 
-    def find_pos_in_entities(self, entities, name):
-        for i in range(len(entities)):
-            word = self.bdp.lemmatize(entities[i][0])
-            if word == name.lower():
-                return i
-        return -1
-
-    def entity_lenth_filter(self, entity):
-        if entity[1] == 'O' and len(entity[0]) <= 2:
-            return True
-        else:
-            return False
-
-    def test_BM25_par(self):
-        # n = 1
-        k1 = 0.1
-        b = 0.1
-        best_accuracy = 0
-        best_k1 = 0.1
-        best_b = 0.1
-        fname = 'bm25_dev_' + time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(time.time())) + '.csv'
-        with open(fname, 'wb') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            csv_writer.writerow(["k1", 'b'])
-            for i in range(21):
-                for j in range(21):
-                    print(str(k1), str(b))
-                    self.bm25.k1 = k1
-                    self.bm25.b = b
-                    acc = self.bm25.test_dev_BM25_accuracy(2)
-                    if acc > best_accuracy:
-                        best_accuracy = acc
-                        best_k1 = k1
-                        best_b = b
-                    csv_writer.writerow([k1, b, acc])
-                    b += 0.1
-                k1 += 0.1
-                b = 0.1
-            csv_writer.writerow(["best"])
-            csv_writer.writerow([best_accuracy, best_k1, best_b])
-        print(str(best_accuracy), str(best_k1), str(best_b))
-        return
-
+    # predict answers by using bm25 finding answer sentence
     def predict_with_bm25_sents(self, type):
+        # count correctly predicted questions
         correct = 0
+        # count correctly predicted paragraphs
         correct_id = 0
+        # save already processed doc entities for reuse to improve performance
         doc_entity_temp = {}
+        # save already separated sentences of docs
         doc_text_temp = {}
         doc_all = self.data.doc_texts
         qs_all = []
@@ -432,12 +410,13 @@ class RuleBasedQA:
             csv_writer = csv.writer(csv_file)
             if type == 0 or type == 1:
                 csv_writer.writerow(
-                    ['W/R', 'query', 'predicted_id_R/W', 'actual_id', 'predicted_answer', 'actual_answer',
+                    ['W/R', 'query', 'predicted_id_R/W', 'actual_id', 'predicted_answer',
+                     'actual_answer',
                      'predicted_answer_type', 'predicated_candidates'])
             else:
                 csv_writer.writerow(['id', 'answer'])
             for i in range(total):
-            # for i in range(20):
+                # for i in range(20):
                 print(i, " / ", total)
 
                 qs = qs_all[i]
@@ -446,44 +425,63 @@ class RuleBasedQA:
                 if type == 0 or type == 1:
                     answer = answer_all[i]
                     answer_par_id = answer_par_id_all[i]
+                # preprocess questions and return tokens
                 qs_processed = self.preprocess_questions(qs)
                 doc_processed = self.data.doc_processed[doc_id]
 
+                # get doc entities saving in format of
+                # [sentence...[entitiy...]]
                 doc_entities = []
+                # get doc sentences saving in format of
+                # [sentence1, sentence2..]
                 doc_sents_text = []
                 if doc_id in doc_entity_temp:
                     doc_entities = doc_entity_temp[doc_id]
                     doc_sents_text = doc_text_temp[doc_id]
                 else:
+                    # iterate paragraphs of that doc
                     for par in doc:
                         sents_text = sent_tokenize(par)
                         doc_sents_text += sents_text
+                        # iterate sentences of the paragraph
                         for sent in sents_text:
                             doc_entities.append(self.ner_process(sent))
                     doc_entity_temp[doc_id] = doc_entities
                     doc_text_temp[doc_id] = doc_sents_text
 
+                # extract wh word
                 wh = self.extract_wh_word(qs_processed)
+                # identify answer ner tag ranks and question type
                 possible_qs_type_rank, qs_type = self.identify_question_type(wh, qs_processed)
                 pred_answer = 'unknown'
+                # predicted answer
+                predict_answer = 'unknown'
+                # predicated answer ner tags
                 answer_types = []
-                pred_sent_id = -1
+                # predicated paragraph id
                 pred_par_id = -1
+                # finded candidate answers
                 candidate_answers = ''
                 if possible_qs_type_rank:
-                    self.bm25.k1 = 0.1
-                    self.bm25.b = 0.9
+                    self.bm25.k1 = 1.2
+                    self.bm25.b = 0.75
+                    # tokenize sentences
                     sent_tokens = self.bdp.preprocess_doc(doc_sents_text)
+                    # rank sentences based on bm25 scores
                     bm25_sent_tokens_rank = self.bm25.sort_by_bm25_score(qs_processed, sent_tokens)
                     bm25_sent_tokens_rank_ids = [x[0] for x in bm25_sent_tokens_rank]
+                    # iterate sentences from higher bm25 score to lower
                     for sent_id in bm25_sent_tokens_rank_ids:
-                        temp_answer, temp_answer_types, temp_candidate_answers = self.pred_answer_type(doc_entities[sent_id],
-                                                                                                     qs_processed,
-                                                                                                     possible_qs_type_rank,
-                                                                                                     qs_type)
+                        # find a answer and candidate answers
+                        temp_answer, temp_candidate_answers = self.pred_answer_type(
+                            doc_entities[sent_id],
+                            qs_processed,
+                            possible_qs_type_rank,
+                            qs_type)
+                        # if find a answer, break out
                         if temp_answer != -1:
                             pred_answer = temp_answer
-                            answer_types = temp_answer_types
+                            answer_types = possible_qs_type_rank
                             pred_sent_id = sent_id
                             candidate_answers = '; '.join(temp_candidate_answers)
                             break
@@ -500,12 +498,14 @@ class RuleBasedQA:
                         correct_id += 1
                     if answer == pred_answer:
                         csv_writer.writerow(
-                            ["##right##", qs, pred_par_id, answer_par_id, pred_answer, answer, types,
+                            ["##right##", qs, pred_par_id, answer_par_id, pred_answer, answer,
+                             types,
                              candidate_answers])
                         correct += 1
                     else:
                         csv_writer.writerow(
-                            ["##wrong##", qs, pred_par_id, answer_par_id, pred_answer, answer, types,
+                            ["##wrong##", qs, pred_par_id, answer_par_id, pred_answer, answer,
+                             types,
                              candidate_answers])
                     print(answer, " ; ", pred_answer)
                     # print "correct :", correct
@@ -519,29 +519,35 @@ class RuleBasedQA:
                 print(correct_id * 100.0 / total)
                 print("best : 19.470455279302552")
 
+    # predict answers by using bm25 firstly finding answer paragraph
+    # then within that paragraph finding answer sentence
     def predict_with_bm25_pars_sents(self, type):
+        # count correctly predicted questions
         correct = 0
+        # count correctly predicted paragraphs
         correct_id = 0
+        # save already processed doc entities for reuse to improve performance
         doc_entity_temp = {}
+        # save already separated doc sentences
         doc_text_temp = {}
         doc_all = self.data.doc_texts
         qs_all = []
         doc_id_all = []
         answer_all = []
         answer_par_id_all = []
-        if type == 0: # train
+        if type == 0:  # train
             qs_all = self.data.train_questions
             doc_id_all = self.data.train_doc_ids
             answer_all = self.data.train_answers
             answer_par_id_all = self.data.train_answer_par_ids
             fname = self.config.predict_train_output_path
-        elif type == 1: # dev
+        elif type == 1:  # dev
             qs_all = self.data.dev_questions
             doc_id_all = self.data.dev_doc_ids
             answer_all = self.data.dev_answers
             answer_par_id_all = self.data.dev_answer_par_ids
             fname = self.config.predict_dev_output_path
-        else: #test
+        else:  # test
             qs_all = self.data.test_questions
             doc_id_all = self.data.test_doc_ids
             test_ids = self.data.test_ids
@@ -551,12 +557,13 @@ class RuleBasedQA:
             csv_writer = csv.writer(csv_file)
             if type == 0 or type == 1:
                 csv_writer.writerow(
-                    ['W/R', 'query', 'predicted_id_R/W', 'actual_id', 'predicted_answer', 'actual_answer',
+                    ['W/R', 'query', 'predicted_id_R/W', 'actual_id', 'predicted_answer',
+                     'actual_answer',
                      'predicted_answer_type', 'predicated_candidates'])
             else:
                 csv_writer.writerow(['id', 'answer'])
             for i in range(total):
-            # for i in range(20):
+                # for i in range(20):
                 print(i, " / ", total)
 
                 qs = qs_all[i]
@@ -565,52 +572,72 @@ class RuleBasedQA:
                 if type == 0 or type == 1:
                     answer = answer_all[i]
                     answer_par_id = answer_par_id_all[i]
+                # preprocess questions and return tokens
                 qs_processed = self.preprocess_questions(qs)
                 doc_processed = self.data.doc_processed[doc_id]
 
+                # get doc entities saving in format of
+                # [paragraph...[sentence...[entitiy...]]]
                 doc_entities = []
                 if doc_id in doc_entity_temp:
                     doc_entities = doc_entity_temp[doc_id]
                 else:
+                    # iterate paragraphs of that doc
                     for par in doc:
                         par_entities = []
                         sent_text = sent_tokenize(par)
+                        # iterate sentences of the paragraph
                         for sent in sent_text:
                             par_entities.append(self.ner_process(sent))
                         doc_entities.append(par_entities)
                     doc_entity_temp[doc_id] = doc_entities
 
+                # extract wh word
                 wh = self.extract_wh_word(qs_processed)
+                # identify answer ner tag ranks and question type
                 possible_qs_type_rank, qs_type = self.identify_question_type(wh, qs_processed)
+                # predicted answer
                 predict_answer = 'unknown'
+                # predicated answer ner tags
                 answer_types = []
+                # predicated paragraph id
                 pred_par_id = -1
+                # finded candidate answers
                 candidate_answers = ''
                 if possible_qs_type_rank:
                     self.bm25.k1 = 1.2
                     self.bm25.b = 0.75
+                    # rank paragraphs based on bm25 scores
                     bm25_rank = self.bm25.sort_by_bm25_score(qs_processed, doc_processed)
                     bm25_rank_par_ids = [x[0] for x in bm25_rank]
+                    # iterate paragraphs from higher bm25 score to lower
                     for par_id in bm25_rank_par_ids:
                         par_text = doc[par_id]
                         sents_text = sent_tokenize(par_text)
+                        # tokenize sentences of the paragraph
                         sent_tokens = self.bdp.preprocess_doc(sents_text)
-                        bm25_sent_tokens_rank = self.bm25.sort_by_bm25_score(qs_processed, sent_tokens)
+                        # rank sentences based on bm25 scores
+                        bm25_sent_tokens_rank = self.bm25.sort_by_bm25_score(qs_processed,
+                                                                             sent_tokens)
                         bm25_sent_tokens_rank_ids = [x[0] for x in bm25_sent_tokens_rank]
+                        # iterate sentences from higher bm25 score to lower
                         for sent_id in bm25_sent_tokens_rank_ids:
-                            temp_answer, temp_answer_types, temp_candidate_answers = self.pred_answer_type(
-                                                                                                    doc_entities[
-                                                                                                        par_id][
-                                                                                                        sent_id],
-                                                                                                    qs_processed,
-                                                                                                    possible_qs_type_rank,
-                                                                                                    qs_type)
+                            # find a answer and candidate answers
+                            temp_answer, temp_candidate_answers = self.pred_answer_type(
+                                doc_entities[
+                                    par_id][
+                                    sent_id],
+                                qs_processed,
+                                possible_qs_type_rank,
+                                qs_type)
+                            # if find a answer, break out
                             if temp_answer != -1:
                                 predict_answer = temp_answer
-                                answer_types = temp_answer_types
+                                answer_types = possible_qs_type_rank
                                 pred_par_id = par_id
                                 candidate_answers = '; '.join(temp_candidate_answers)
                                 break
+                        # if find a answer, break out
                         if temp_answer != -1:
                             break
 
@@ -620,12 +647,14 @@ class RuleBasedQA:
                         correct_id += 1
                     if predict_answer == answer:
                         csv_writer.writerow(
-                            ["##right##", qs, pred_par_id, answer_par_id, predict_answer, answer, types,
+                            ["##right##", qs, pred_par_id, answer_par_id, predict_answer, answer,
+                             types,
                              candidate_answers])
                         correct += 1
                     else:
                         csv_writer.writerow(
-                            ["##wrong##", qs, pred_par_id, answer_par_id, predict_answer, answer, types,
+                            ["##wrong##", qs, pred_par_id, answer_par_id, predict_answer, answer,
+                             types,
                              candidate_answers])
                     print(predict_answer, " ; ", answer)
                     # print "correct :", correct
@@ -639,6 +668,7 @@ class RuleBasedQA:
                 print(correct * 100.0 / total)
                 print(correct_id * 100.0 / total)
                 print("best : 19.470455279302552")
+
 
 if __name__ == '__main__':
     rule_based_QA = RuleBasedQA()

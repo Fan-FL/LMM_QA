@@ -11,6 +11,7 @@ import pickle
 import numpy as np
 from stanfordcorenlp import StanfordCoreNLP
 
+
 class BasicDataProcessor:
     def __init__(self, config, data):
         self.config = config
@@ -27,7 +28,7 @@ class BasicDataProcessor:
         total = int(len(self.data.train_qs_processed))
 
         for i in range(total):
-            if i%1000 == 0:
+            if i % 1000 == 0:
                 print(i, '/', total)
             # train_qs = self.data.train_qs_processed[i]
             train_answer = self.data.train_answers[i]
@@ -57,7 +58,6 @@ class BasicDataProcessor:
             # pickle.dump([question_vectors, answer_tags], f)
             pickle.dump(answer_tags, f, protocol=2)
 
-
     def dev_sens_embeddings(self):
         question_vectors = []
         answer_tags = []
@@ -65,7 +65,7 @@ class BasicDataProcessor:
         total = int(len(self.data.dev_qs_processed))
 
         for i in range(total):
-            if i%1000 == 0:
+            if i % 1000 == 0:
                 print(i, '/', total)
             train_answer = self.data.dev_answers[i]
             answer_tags.append(self.nlp.ner(train_answer))
@@ -135,9 +135,12 @@ class BasicDataProcessor:
     #     return lemmatized_tokens_replaced, original_tokens, ner_tags, doc_par_tokens
 
     def preprocess_doc(self, doc):
-        normal_tokens = [word_tokenize(par.replace(u"\u200b",'').replace(u"\u2014",'')) for par in doc]
-        remove_punc_tokens = [[token for token in tokens if not self.is_pure_puncs(token)] for tokens in normal_tokens]
-        remove_punc_in_tokens = [[self.remove_punc_in_token(token) for token in tokens] for tokens in remove_punc_tokens]
+        normal_tokens = [word_tokenize(par.replace(u"\u200b", '').replace(u"\u2014", '')) for par in
+                         doc]
+        remove_punc_tokens = [[token for token in tokens if not self.is_pure_puncs(token)] for
+                              tokens in normal_tokens]
+        remove_punc_in_tokens = [[self.remove_punc_in_token(token) for token in tokens] for tokens
+                                 in remove_punc_tokens]
         lower_tokens = [self.lower_tokens(tokens) for tokens in remove_punc_in_tokens]
         lemmatized_tokens = [self.lemmatize_tokens(tokens) for tokens in lower_tokens]
         return lemmatized_tokens
